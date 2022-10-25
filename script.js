@@ -12,32 +12,71 @@ const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
 
 class Workout {
-    constructor(id, distance, duration, coords, date) {
-        this.id = id;
+    static #id = 0;
+
+    constructor(distance, duration, coords, date) {
+        this.id = Workout.#countingObjects();
         this.distance = distance;
         this.duration = duration;
         this.coords = coords;
         this.date = date;
     }
 
-    _getNameOfMonth(monthIndex) {
-        return months[monthIndex];
+    static #countingObjects() {
+        return Workout.#id++;
+    }
+
+    _getNameOfMonth(isoString) {
+        return months[new Date(isoString).getMonth()];
+    }
+
+    _getDate(isoString) {
+        return String(new Date(isoString).getDate()).padStart(2, 0);
+    }
+
+    _addMarkToMap(map) {
+        L.marker(this.coords)
+            .addTo(map)
+            .bindPopup(
+                L.popup({
+                    maxWidth: 250,
+                    minWidth: 100,
+                    autoClose: false, // prevent the default behavior of the popup closing when another popup is opened
+                    closeOnClick: false, // prevent whenever user clicks on the map
+                    className: `${
+                        Object.getPrototypeOf(this) === Running.prototype
+                            ? 'running-popup'
+                            : 'cycling-popup'
+                    }`,
+                })
+            )
+            .setPopupContent(
+                `${
+                    Object.getPrototypeOf(this) === Cycling.prototype
+                        ? '🚴‍♀️ Cycling'
+                        : '🏃‍♂️ Running'
+                } on ${this._getNameOfMonth(this.date)} ${this._getDate(
+                    this.date
+                )}`
+            )
+            .openPopup();
+        return this;
     }
 }
 
 class Running extends Workout {
-    constructor(id, distance, duration, coords, date, cadence, pace) {
-        super(id, distance, duration, coords, date);
+    constructor(distance, duration, coords, date, cadence, pace) {
+        super(distance, duration, coords, date);
         this.cadence = cadence;
         this.pace = pace;
     }
 
     render() {
         const html = `
-        <li class="workout workout--running" data-id="1234567890">
+        <li class="workout workout--running" data-id="${this.id}">
             <h2 class="workout__title">Running on ${this._getNameOfMonth(
-                this.date.getMonth()
-            )} ${this.date.getDate()}</h2>
+                this.date
+            )} ${this._getDate(this.date)}</h2>
             <div class="workout__details">
                 <span class="workout__icon">🏃‍♂️</span>
                 <span class="workout__value">${this.distance}</span>
@@ -65,40 +104,23 @@ class Running extends Workout {
     }
 
     addMarkToMap(map) {
-        L.marker(this.coords)
-            .addTo(map)
-            .bindPopup(
-                L.popup({
-                    maxWidth: 250,
-                    minWidth: 100,
-                    autoClose: false, // prevent the default behavior of the popup closing when another popup is opened
-                    closeOnClick: false, // prevent whenever user clicks on the map
-                    className: 'running-popup',
-                })
-            )
-            .setPopupContent(
-                `🏃‍♂️ Running on ${this._getNameOfMonth(
-                    this.date.getMonth()
-                )} ${this.date.getDate()}`
-            )
-            .openPopup();
-        return this;
+        return this._addMarkToMap(map);
     }
 }
 
 class Cycling extends Workout {
-    constructor(id, distance, duration, coords, date, elevationGain, speed) {
-        super(id, distance, duration, coords, date);
+    constructor(distance, duration, coords, date, elevationGain, speed) {
+        super(distance, duration, coords, date);
         this.elevationGain = elevationGain;
         this.speed = speed;
     }
 
     render() {
         const html = `
-        <li class="workout workout--running" data-id="1234567890">
+        <li class="workout workout--cycling" data-id="${this.id}">
             <h2 class="workout__title">Cycling on ${this._getNameOfMonth(
-                this.date.getMonth()
-            )} ${this.date.getDate()}</h2>
+                this.date
+            )} ${this._getDate(this.date)}</h2>
             <div class="workout__details">
                 <span class="workout__icon">🚴‍♀️</span>
                 <span class="workout__value">${this.distance}</span>
@@ -126,29 +148,12 @@ class Cycling extends Workout {
     }
 
     addMarkToMap(map) {
-        L.marker(this.coords)
-            .addTo(map)
-            .bindPopup(
-                L.popup({
-                    maxWidth: 250,
-                    minWidth: 100,
-                    autoClose: false, // prevent the default behavior of the popup closing when another popup is opened
-                    closeOnClick: false, // prevent whenever user clicks on the map
-                    className: 'cycling-popup',
-                })
-            )
-            .setPopupContent(
-                `🚴‍♀️ Cycling on ${this._getNameOfMonth(
-                    this.date.getMonth()
-                )} ${this.date.getDate()}`
-            )
-            .openPopup();
-        return this;
+        return this._addMarkToMap(map);
     }
 }
 
 class App {
-    workouts = [];
+    static workouts = [];
     #map;
     #mapEvent;
 
@@ -158,9 +163,7 @@ class App {
 
     _getPosition() {
         navigator.geolocation.getCurrentPosition(
-            position => {
-                this._loadMap(position);
-            },
+            this._loadMap.bind(this),
             () => {
                 alert('Could not get your position');
             }
@@ -172,6 +175,8 @@ class App {
 
         const coords = [latitude, longitude];
 
+        // if we doesn't set the this keyword manually, we will get an undefined
+        // console.log(this);
         this.#map = L.map('map').setView(coords, 13);
 
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -206,6 +211,13 @@ class App {
         });
     }
 
+    _resetFields() {
+        inputCadence
+            .closest('.form__row')
+            .classList.remove('form__row--hidden');
+        inputElevation.closest('.form__row').classList.add('form__row--hidden');
+    }
+
     _newWorkout() {
         form.addEventListener('submit', e => {
             e.preventDefault();
@@ -215,37 +227,45 @@ class App {
             const type = inputType.value;
 
             if (type === 'running') {
-                new Running(
-                    0,
-                    inputDistance.value,
-                    inputDuration.value,
-                    coords,
-                    new Date(),
-                    inputCadence.value,
-                    0
-                )
-                    .render()
-                    .addMarkToMap(this.#map);
+                App.workouts.push(
+                    new Running(
+                        inputDistance.value,
+                        inputDuration.value,
+                        coords,
+                        new Date().toISOString(),
+                        inputCadence.value,
+                        0 // pace
+                    )
+                        .render()
+                        .addMarkToMap(this.#map)
+                );
             } else {
-                new Cycling(
-                    0,
-                    inputDistance.value,
-                    inputDuration.value,
-                    coords,
-                    new Date(),
-                    inputElevation.value,
-                    0
-                )
-                    .render()
-                    .addMarkToMap(this.#map);
+                App.workouts.push(
+                    new Cycling(
+                        inputDistance.value,
+                        inputDuration.value,
+                        coords,
+                        new Date().toISOString(),
+                        inputElevation.value,
+                        0 // speed
+                    )
+                        .render()
+                        .addMarkToMap(this.#map)
+                );
             }
 
             e.currentTarget.classList.add('hidden');
             form.reset();
+            this._resetFields();
         });
     }
 }
 
+// One example that we could use for inputs in an application like this would be for example,
+// an object of options, which is pretty common in third party libraries. So if we were
+// building a library for some other people to use, then we could allow these developers
+// to customize the library, using some options. But again does just not necessary in this
+// case, all right? NOIDONTTHINKSO
 new App();
 
 //////////////////////////////////////////////////////
@@ -295,8 +315,28 @@ new App();
 // 4. Architecture. Let's just start coding.
 
 /*
-////////////////////////////////////////////////////////////
-// Using the Geolocation API
+//////////////////////////////////////////////////////////////////////
+// Project Architecture
+// If the application was a bit more complex, then we could divide this Architecture even 
+// further and create one class that would only be concerned with the USER INTERFACE and one
+// class for the so-called Business Logic. So basically, the logic that works only with the
+// underlying data
+// But in this case, we can just keep it simple like this. And so as I mentioned before, this
+// Architecture will then allow us to have everything that is about the application in one 
+// nice, self contained block. And besides the application itself, we then also have these
+// classes that are only concerned about the data. And so therefore, application and data 
+// will be nicely separated in a very logical way. Now, what's also great about this, is that
+// we will be able to protect all of these methods, so that they are nicely encapsulated and
+// not accessible from everywhere else in the code. So that's the reason why you see these
+// underscores on all of the method names. Right, so that is, again, the convention that we 
+// can use to protect method names from being changed and used from the outside. And so 
+// this will make the code a lot easier to work with because we will know for sure that no
+// place else in the code is working with the data. 
+// But anyway, this is the initial approach for Architecture that we're now gonna implement.
+// And of course, based on the code that we already have. We will keep adding more methods
+// and properties as we go but this is already an excellent starting point.
+
+////////////////////////////////////////////////////////////////////
 let map, mapEvent;
 
 navigator.geolocation?.getCurrentPosition(
