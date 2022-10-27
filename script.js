@@ -12,14 +12,14 @@ const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
 
 class Workout {
-    static #id = 0;
+    static #id = 0n;
+    date = new Date().toISOString();
 
-    constructor(distance, duration, coords, date) {
+    constructor(distance, duration, coords) {
         this.id = Workout.#countingObjects();
-        this.distance = distance;
-        this.duration = duration;
-        this.coords = coords;
-        this.date = date;
+        this.distance = distance; // in km
+        this.duration = duration; // in min
+        this.coords = coords; // [lat, lng]
     }
 
     static #countingObjects() {
@@ -34,7 +34,7 @@ class Workout {
         return String(new Date(isoString).getDate()).padStart(2, 0);
     }
 
-    _addMarkToMap(map) {
+    addMarkToMap(map) {
         L.marker(this.coords)
             .addTo(map)
             .bindPopup(
@@ -65,10 +65,16 @@ class Workout {
 }
 
 class Running extends Workout {
-    constructor(distance, duration, coords, date, cadence, pace) {
-        super(distance, duration, coords, date);
+    constructor(distance, duration, coords, cadence) {
+        super(distance, duration, coords);
         this.cadence = cadence;
-        this.pace = pace;
+        this._calcPace();
+    }
+
+    _calcPace() {
+        // min/km
+        this.pace = this.duration / this.distance;
+        return this.pace;
     }
 
     render() {
@@ -102,17 +108,19 @@ class Running extends Workout {
         containerWorkouts.insertAdjacentHTML('beforeend', html);
         return this;
     }
-
-    addMarkToMap(map) {
-        return this._addMarkToMap(map);
-    }
 }
 
 class Cycling extends Workout {
-    constructor(distance, duration, coords, date, elevationGain, speed) {
-        super(distance, duration, coords, date);
+    constructor(distance, duration, coords, elevationGain) {
+        super(distance, duration, coords);
         this.elevationGain = elevationGain;
-        this.speed = speed;
+        this._calcSpeed();
+    }
+
+    _calcSpeed() {
+        // km/h
+        this.speed = this.distance / (this.duration / 60);
+        return this.speed;
     }
 
     render() {
@@ -146,22 +154,32 @@ class Cycling extends Workout {
         containerWorkouts.insertAdjacentHTML('beforeend', html);
         return this;
     }
-
-    addMarkToMap(map) {
-        return this._addMarkToMap(map);
-    }
 }
 
+////////////////////////////////////////////////////
+// APPLICATION ARCHITECTURE
 class App {
     static workouts = [];
     #map;
     #mapEvent;
 
     constructor() {
+        // basically every small piece of functionality that is in our application, we now
+        // want to be it's own function.
         this._getPosition();
+        form.addEventListener('submit', this._newWorkout.bind(this));
+        inputType.addEventListener('change', this._toggleElevationField);
+        containerWorkouts.addEventListener('click', this._showOnMap.bind(this));
     }
 
     _getPosition() {
+        // loadMap method called by getCurrentPosition function, and in fact this is actually
+        // treated as a regular function call, not as a method call.
+        // since this is a callback function, we are not calling it ourselves. It is the
+        // getCurrentPosition function that we'll call this callback function(loadMap)
+        // once that it gets the currentPosition of the user. And when it calls this method,
+        // then it does so, as a regular function call. And as we learned before, in a
+        // regular function call, the this keyword is set to undefined.
         navigator.geolocation.getCurrentPosition(
             this._loadMap.bind(this),
             () => {
@@ -184,80 +202,83 @@ class App {
                 '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         }).addTo(this.#map);
 
-        this._showForm();
+        this.#map.on('click', this._showForm.bind(this));
     }
 
-    _showForm() {
-        this.#map.on('click', mapE => {
-            form.classList.remove('hidden');
-            inputDistance.focus();
-            this.#mapEvent = mapE;
-        });
-
-        this._toggleElevationField();
-        this._newWorkout();
+    _showForm(mapE) {
+        form.classList.remove('hidden');
+        inputDistance.focus();
+        this.#mapEvent = mapE;
     }
 
-    _toggleElevationField() {
-        inputType.addEventListener('change', e => {
-            e.preventDefault();
+    _toggleElevationField(e) {
+        e.preventDefault();
 
-            inputCadence
-                .closest('.form__row')
-                .classList.toggle('form__row--hidden');
-            inputElevation
-                .closest('.form__row')
-                .classList.toggle('form__row--hidden');
-        });
+        inputCadence
+            .closest('.form__row')
+            .classList.toggle('form__row--hidden');
+        inputElevation
+            .closest('.form__row')
+            .classList.toggle('form__row--hidden');
     }
 
     _resetFields() {
+        form.reset();
         inputCadence
             .closest('.form__row')
             .classList.remove('form__row--hidden');
         inputElevation.closest('.form__row').classList.add('form__row--hidden');
     }
 
-    _newWorkout() {
-        form.addEventListener('submit', e => {
-            e.preventDefault();
+    _newWorkout(e) {
+        e.preventDefault();
 
-            const { lat: latitude, lng: longitude } = this.#mapEvent.latlng;
-            const coords = [latitude, longitude];
-            const type = inputType.value;
+        const { lat: latitude, lng: longitude } = this.#mapEvent.latlng;
+        const coords = [latitude, longitude];
+        const type = inputType.value;
 
-            if (type === 'running') {
-                App.workouts.push(
-                    new Running(
-                        inputDistance.value,
-                        inputDuration.value,
-                        coords,
-                        new Date().toISOString(),
-                        inputCadence.value,
-                        0 // pace
-                    )
-                        .render()
-                        .addMarkToMap(this.#map)
-                );
-            } else {
-                App.workouts.push(
-                    new Cycling(
-                        inputDistance.value,
-                        inputDuration.value,
-                        coords,
-                        new Date().toISOString(),
-                        inputElevation.value,
-                        0 // speed
-                    )
-                        .render()
-                        .addMarkToMap(this.#map)
-                );
-            }
+        if (type === 'running') {
+            App.workouts.push(
+                new Running(
+                    inputDistance.value,
+                    inputDuration.value,
+                    coords,
+                    inputCadence.value
+                )
+                    .render()
+                    .addMarkToMap(this.#map)
+            );
+        } else {
+            App.workouts.push(
+                new Cycling(
+                    inputDistance.value,
+                    inputDuration.value,
+                    coords,
+                    inputElevation.value
+                )
+                    .render()
+                    .addMarkToMap(this.#map)
+            );
+        }
 
-            e.currentTarget.classList.add('hidden');
-            form.reset();
-            this._resetFields();
+        e.currentTarget.classList.add('hidden');
+        this._resetFields();
+    }
+
+    _showOnMap(e) {
+        const closest = e.target.closest('.workout');
+        if (!closest) return; // if we get null, we will get out of the event handler function
+
+        const options = {
+            animate: true,
+            duration: 0.5,
+        };
+
+        const workout = App.workouts.find(({ id }) => {
+            return id === BigInt(closest.dataset.id);
         });
+
+        this.#map.panTo(workout.coords, options);
     }
 }
 
