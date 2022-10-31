@@ -1,8 +1,5 @@
 'use strict';
 
-// prettier-ignore
-const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
 const form = document.querySelector('.form');
 const containerWorkouts = document.querySelector('.workouts');
 const inputType = document.querySelector('.form__input--type');
@@ -20,18 +17,34 @@ class Workout {
         this.distance = distance; // in km
         this.duration = duration; // in min
         this.coords = coords; // [lat, lng]
+        this._setDescription(this.date);
     }
 
     static #countingObjects() {
-        return Workout.#id++;
+        return String(Workout.#id++);
     }
 
-    _getNameOfMonth(isoString) {
-        return months[new Date(isoString).getMonth()];
+    _setProperty(firstVal, secondVal) {
+        let value;
+
+        Object.getPrototypeOf(this) === Running.prototype && (value = firstVal);
+        Object.getPrototypeOf(this) === Cycling.prototype &&
+            (value = secondVal);
+
+        return value ?? 'no-value';
     }
 
-    _getDate(isoString) {
-        return String(new Date(isoString).getDate()).padStart(2, 0);
+    _setDescription(isoString) {
+        // prettier-ignore
+        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const date = new Date(isoString);
+        const getMonth = date => months[date.getMonth()];
+        const getDate = date => String(date.getDate()).padStart(2, 0);
+
+        this.description = `${this._setProperty(
+            'Running',
+            'Cycling'
+        )} on ${getMonth(date)} ${getDate(date)}`;
     }
 
     addMarkToMap(map) {
@@ -43,42 +56,29 @@ class Workout {
                     minWidth: 100,
                     autoClose: false, // prevent the default behavior of the popup closing when another popup is opened
                     closeOnClick: false, // prevent whenever user clicks on the map
-                    className: `${
-                        Object.getPrototypeOf(this) === Running.prototype
-                            ? 'running-popup'
-                            : 'cycling-popup'
-                    }`,
+                    className: `${this._setProperty(
+                        'running-popup',
+                        'cycling-popup'
+                    )}`,
                 })
             )
-            .setPopupContent(
-                `${
-                    Object.getPrototypeOf(this) === Cycling.prototype
-                        ? '🚴‍♀️ Cycling'
-                        : '🏃‍♂️ Running'
-                } on ${this._getNameOfMonth(this.date)} ${this._getDate(
-                    this.date
-                )}`
-            )
+            .setPopupContent(this.description)
             .openPopup();
         return this;
     }
 
     render() {
         const html = `
-        <li class="workout workout--${
-            Object.getPrototypeOf(this) === Running.prototype
-                ? 'running'
-                : 'cycling'
-        }" data-id="${this.id}">
-            <h2 class="workout__title">Running on ${this._getNameOfMonth(
-                this.date
-            )} ${this._getDate(this.date)}</h2>
+        <li class="workout workout--${this._setProperty(
+            'running',
+            'cycling'
+        )}" data-id="${this.id}">
+            <h2 class="workout__title">${this.description}</h2>
             <div class="workout__details">
-                <span class="workout__icon">${
-                    Object.getPrototypeOf(this) === Running.prototype
-                        ? '🏃‍♂️'
-                        : '🚴‍♀️'
-                }</span>
+                <span class="workout__icon">${this._setProperty(
+                    '🏃‍♂️',
+                    '🚴‍♀️'
+                )}</span>
                 <span class="workout__value">${this.distance}</span>
                 <span class="workout__unit">km</span>
             </div>
@@ -89,37 +89,32 @@ class Workout {
             </div>
             <div class="workout__details">
                     <span class="workout__icon">⚡️</span>
-                    <span class="workout__value">${
-                        Object.getPrototypeOf(this) === Running.prototype
-                            ? this.pace
-                            : this.speed
-                    }</span>
-                    <span class="workout__unit">${
-                        Object.getPrototypeOf(this) === Running.prototype
-                            ? 'min/km'
-                            : 'km/h'
-                    }</span>
+                    <span class="workout__value">${this._setProperty(
+                        this.pace,
+                        this.speed
+                    )}</span>
+                    <span class="workout__unit">${this._setProperty(
+                        'min/km',
+                        'km/h'
+                    )}</span>
                 </div>
                 <div class="workout__details">
-                    <span class="workout__icon">${
-                        Object.getPrototypeOf(this) === Running.prototype
-                            ? '🦶🏼'
-                            : '⛰'
-                    }</span>
-                    <span class="workout__value">${
-                        Object.getPrototypeOf(this) === Running.prototype
-                            ? this.cadence
-                            : this.elevationGain
-                    }</span>
-                    <span class="workout__unit">${
-                        Object.getPrototypeOf(this) === Running.prototype
-                            ? 'spm'
-                            : 'm'
-                    }</span>
+                    <span class="workout__icon">${this._setProperty(
+                        '🦶🏼',
+                        '⛰'
+                    )}</span>
+                    <span class="workout__value">${this._setProperty(
+                        this.cadence,
+                        this.elevationGain
+                    )}</span>
+                    <span class="workout__unit">${this._setProperty(
+                        'spm',
+                        'm'
+                    )}</span>
                 </div>
             </li>`;
 
-        containerWorkouts.insertAdjacentHTML('beforeend', html);
+        form.insertAdjacentHTML('afterend', html);
         return this;
     }
 }
@@ -158,14 +153,21 @@ class App {
     static workouts = [];
     #map;
     #mapEvent;
+    #mapZoomLevel = 13;
 
     constructor() {
         // basically every small piece of functionality that is in our application, we now
         // want to be it's own function.
         this._getPosition();
+
+        this._getLocalStorage();
+
         form.addEventListener('submit', this._newWorkout.bind(this));
         inputType.addEventListener('change', this._toggleElevationField);
-        containerWorkouts.addEventListener('click', this._showOnMap.bind(this));
+        containerWorkouts.addEventListener(
+            'click',
+            this._moveToPopup.bind(this)
+        );
     }
 
     _getPosition() {
@@ -191,7 +193,7 @@ class App {
 
         // if we doesn't set the this keyword manually, we will get an undefined
         // console.log(this);
-        this.#map = L.map('map').setView(coords, 13);
+        this.#map = L.map('map').setView(coords, this.#mapZoomLevel);
 
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution:
@@ -218,8 +220,12 @@ class App {
             .classList.toggle('form__row--hidden');
     }
 
-    _resetFields() {
+    _hideForm() {
         form.reset();
+        form.style.display = 'none';
+        form.classList.add('hidden');
+        setTimeout(() => (form.style.display = 'grid'), 1);
+
         inputCadence
             .closest('.form__row')
             .classList.remove('form__row--hidden');
@@ -229,7 +235,8 @@ class App {
     _newWorkout(e) {
         const allPositive = (...inputs) => inputs.every(input => +input > 0);
 
-        const isEmptyInputs = (...inputs) => inputs.some(input => input === '');
+        const isFilledInputs = (...inputs) =>
+            inputs.every(input => input !== '');
 
         const validInputsNumbers = (...inputs) =>
             inputs.every(input => Number.isFinite(+input));
@@ -245,14 +252,14 @@ class App {
         if (type === 'running') {
             const cadence = inputCadence.value;
 
-            if (isEmptyInputs(distance, duration, cadence))
+            if (!isFilledInputs(distance, duration, cadence))
                 return alert('Inputs have to be filled!');
-
-            if (!allPositive(distance, duration, cadence))
-                return alert('Inputs have to be positive numbers!');
 
             if (!validInputsNumbers(distance, duration, cadence))
                 return alert('Inputs have to be THE numbers!');
+
+            if (!allPositive(distance, duration, cadence))
+                return alert('Inputs have to be positive numbers!');
 
             App.workouts.push(
                 new Running(distance, duration, coords, cadence)
@@ -260,17 +267,18 @@ class App {
                     .addMarkToMap(this.#map)
             );
         }
+
         if (type === 'cycling') {
             const elevationGain = inputElevation.value;
 
-            if (isEmptyInputs(distance, duration, elevationGain))
+            if (!isFilledInputs(distance, duration, elevationGain))
                 return alert('Inputs have to be filled!');
-
-            if (!allPositive(distance, duration))
-                return alert('Inputs have to be positive numbers!');
 
             if (!validInputsNumbers(distance, duration, elevationGain))
                 return alert('Inputs have to be THE numbers!');
+
+            if (!allPositive(distance, duration))
+                return alert('Inputs have to be positive numbers!');
 
             App.workouts.push(
                 new Cycling(distance, duration, coords, elevationGain)
@@ -279,13 +287,13 @@ class App {
             );
         }
 
-        e.currentTarget.classList.add('hidden');
-        this._resetFields();
+        this._hideForm();
+        this._setLocalStorage();
     }
 
-    _showOnMap(e) {
+    _moveToPopup(e) {
         const closest = e.target.closest('.workout');
-        if (!closest) return; // if we get null, we will get out of the event handler function
+        if (!closest) return; // if we get null, we'll get out of the event handler function
 
         const options = {
             animate: true,
@@ -293,10 +301,20 @@ class App {
         };
 
         const workout = App.workouts.find(({ id }) => {
-            return id === BigInt(closest.dataset.id);
+            console.log(id);
+            return id === closest.dataset.id;
         });
 
         this.#map.panTo(workout.coords, options);
+    }
+
+    _setLocalStorage() {
+        localStorage.setItem('workouts', JSON.stringify(App.workouts));
+    }
+
+    _getLocalStorage() {
+        localStorage.getItem('workouts') &&
+            (App.workouts = JSON.parse(localStorage.getItem('workouts')));
     }
 }
 
