@@ -27,9 +27,8 @@ class Workout {
     _setProperty(firstVal, secondVal) {
         let value;
 
-        Object.getPrototypeOf(this) === Running.prototype && (value = firstVal);
-        Object.getPrototypeOf(this) === Cycling.prototype &&
-            (value = secondVal);
+        this === 'running' && (value = firstVal);
+        this === 'cycling' && (value = secondVal);
 
         return value ?? 'no-value';
     }
@@ -41,9 +40,11 @@ class Workout {
         const getMonth = date => months[date.getMonth()];
         const getDate = date => String(date.getDate()).padStart(2, 0);
 
-        this.description = `${this._setProperty(
-            'Running',
-            'Cycling'
+        console.log(this.type);
+        this.description = `${this._setProperty.call(
+            this.type,
+            '🏃‍♂️ Running',
+            '🚴‍♀️Cycling'
         )} on ${getMonth(date)} ${getDate(date)}`;
     }
 
@@ -56,7 +57,8 @@ class Workout {
                     minWidth: 100,
                     autoClose: false, // prevent the default behavior of the popup closing when another popup is opened
                     closeOnClick: false, // prevent whenever user clicks on the map
-                    className: `${this._setProperty(
+                    className: `${this._setProperty.call(
+                        this.type,
                         'running-popup',
                         'cycling-popup'
                     )}`,
@@ -69,13 +71,15 @@ class Workout {
 
     render() {
         const html = `
-        <li class="workout workout--${this._setProperty(
+        <li class="workout workout--${this._setProperty.call(
+            this.type,
             'running',
             'cycling'
         )}" data-id="${this.id}">
             <h2 class="workout__title">${this.description}</h2>
             <div class="workout__details">
-                <span class="workout__icon">${this._setProperty(
+                <span class="workout__icon">${this._setProperty.call(
+                    this.type,
                     '🏃‍♂️',
                     '🚴‍♀️'
                 )}</span>
@@ -123,6 +127,7 @@ class Running extends Workout {
     constructor(distance, duration, coords, cadence) {
         super(+distance, +duration, coords);
         this.cadence = +cadence;
+        this.type = 'running';
         this._calcPace();
     }
 
@@ -137,6 +142,7 @@ class Cycling extends Workout {
     constructor(distance, duration, coords, elevationGain) {
         super(+distance, +duration, coords);
         this.elevationGain = +elevationGain;
+        this.type = 'cycling';
         this._calcSpeed();
     }
 
@@ -222,7 +228,7 @@ class App {
 
     _hideForm() {
         form.reset();
-        form.style.display = 'none';
+        form.style.display = 'none'; // prevent of having animation on the element all the time
         form.classList.add('hidden');
         setTimeout(() => (form.style.display = 'grid'), 1);
 
@@ -233,6 +239,8 @@ class App {
     }
 
     _newWorkout(e) {
+        e.preventDefault();
+
         const allPositive = (...inputs) => inputs.every(input => +input > 0);
 
         const isFilledInputs = (...inputs) =>
@@ -240,8 +248,6 @@ class App {
 
         const validInputsNumbers = (...inputs) =>
             inputs.every(input => Number.isFinite(+input));
-
-        e.preventDefault();
 
         const { lat: latitude, lng: longitude } = this.#mapEvent.latlng;
         const coords = [latitude, longitude];
@@ -313,8 +319,20 @@ class App {
     }
 
     _getLocalStorage() {
-        localStorage.getItem('workouts') &&
-            (App.workouts = JSON.parse(localStorage.getItem('workouts')));
+        if (localStorage.getItem('workouts')) {
+            App.workouts = JSON.parse(localStorage.getItem('workouts'));
+
+            App.workouts.forEach(workout => {
+                console.log(
+                    new Running(
+                        workout.distance,
+                        workout.duration,
+                        workout.coords,
+                        workout.cadence
+                    )
+                );
+            });
+        }
     }
 }
 
