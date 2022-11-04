@@ -9,19 +9,17 @@ const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
 
 class Workout {
-    static #id = 0n;
     date = new Date().toISOString();
 
     constructor(distance, duration, coords) {
-        this.id = Workout.#countingObjects();
         this.distance = distance; // in km
         this.duration = duration; // in min
         this.coords = coords; // [lat, lng]
-        this._setDescription(this.date);
     }
 
-    static #countingObjects() {
-        return String(Workout.#id++);
+    setId(id) {
+        this.id = id;
+        return this;
     }
 
     _setProperty(firstVal, secondVal) {
@@ -40,7 +38,6 @@ class Workout {
         const getMonth = date => months[date.getMonth()];
         const getDate = date => String(date.getDate()).padStart(2, 0);
 
-        console.log(this.type);
         this.description = `${this._setProperty.call(
             this.type,
             '🏃‍♂️ Running',
@@ -70,6 +67,7 @@ class Workout {
     }
 
     render() {
+        console.log(typeof this.type);
         const html = `
         <li class="workout workout--${this._setProperty.call(
             this.type,
@@ -93,25 +91,30 @@ class Workout {
             </div>
             <div class="workout__details">
                     <span class="workout__icon">⚡️</span>
-                    <span class="workout__value">${this._setProperty(
+                    <span class="workout__value">${this._setProperty.call(
+                        this.type,
                         this.pace,
                         this.speed
                     )}</span>
-                    <span class="workout__unit">${this._setProperty(
+                    <span class="workout__unit">${this._setProperty.call(
+                        this.type,
                         'min/km',
                         'km/h'
                     )}</span>
                 </div>
                 <div class="workout__details">
-                    <span class="workout__icon">${this._setProperty(
+                    <span class="workout__icon">${this._setProperty.call(
+                        this.type,
                         '🦶🏼',
                         '⛰'
                     )}</span>
-                    <span class="workout__value">${this._setProperty(
+                    <span class="workout__value">${this._setProperty.call(
+                        this.type,
                         this.cadence,
                         this.elevationGain
                     )}</span>
-                    <span class="workout__unit">${this._setProperty(
+                    <span class="workout__unit">${this._setProperty.call(
+                        this.type,
                         'spm',
                         'm'
                     )}</span>
@@ -124,11 +127,13 @@ class Workout {
 }
 
 class Running extends Workout {
+    type = 'running';
+
     constructor(distance, duration, coords, cadence) {
         super(+distance, +duration, coords);
         this.cadence = +cadence;
-        this.type = 'running';
         this._calcPace();
+        this._setDescription(this.date);
     }
 
     _calcPace() {
@@ -139,11 +144,13 @@ class Running extends Workout {
 }
 
 class Cycling extends Workout {
+    type = 'cycling';
+
     constructor(distance, duration, coords, elevationGain) {
         super(+distance, +duration, coords);
         this.elevationGain = +elevationGain;
-        this.type = 'cycling';
         this._calcSpeed();
+        this._setDescription(this.date);
     }
 
     _calcSpeed() {
@@ -157,6 +164,7 @@ class Cycling extends Workout {
 // APPLICATION ARCHITECTURE
 class App {
     static workouts = [];
+    static #id = 0n;
     #map;
     #mapEvent;
     #mapZoomLevel = 13;
@@ -174,6 +182,18 @@ class App {
             'click',
             this._moveToPopup.bind(this)
         );
+    }
+
+    static #countingObjects() {
+        return String(App.#id++);
+    }
+
+    static setId(id) {
+        this.#id = id;
+    }
+
+    static getId() {
+        return this.#id;
     }
 
     _getPosition() {
@@ -271,6 +291,7 @@ class App {
                 new Running(distance, duration, coords, cadence)
                     .render()
                     .addMarkToMap(this.#map)
+                    .setId(App.#countingObjects())
             );
         }
 
@@ -290,11 +311,12 @@ class App {
                 new Cycling(distance, duration, coords, elevationGain)
                     .render()
                     .addMarkToMap(this.#map)
+                    .setId(App.#countingObjects())
             );
         }
 
-        this._hideForm();
         this._setLocalStorage();
+        this._hideForm();
     }
 
     _moveToPopup(e) {
@@ -316,21 +338,33 @@ class App {
 
     _setLocalStorage() {
         localStorage.setItem('workouts', JSON.stringify(App.workouts));
+        localStorage.setItem('currentId', App.getId());
     }
 
     _getLocalStorage() {
+        console.log(this);
         if (localStorage.getItem('workouts')) {
             App.workouts = JSON.parse(localStorage.getItem('workouts'));
+            localStorage.getItem('currentId') &&
+                App.setId(BigInt(localStorage.getItem('currentId')));
 
             App.workouts.forEach(workout => {
-                console.log(
+                if (workout.type === 'running') {
                     new Running(
                         workout.distance,
                         workout.duration,
                         workout.coords,
                         workout.cadence
-                    )
-                );
+                    ).render();
+                }
+                if (workout.type === 'cycling') {
+                    new Cycling(
+                        workout.distance,
+                        workout.duration,
+                        workout.coords,
+                        workout.elevationGain
+                    ).render();
+                }
             });
         }
     }
@@ -341,7 +375,7 @@ class App {
 // building a library for some other people to use, then we could allow these developers
 // to customize the library, using some options. But again does just not necessary in this
 // case, all right? NOIDONTTHINKSO
-new App();
+const map = new App();
 
 //////////////////////////////////////////////////////
 // How to Plan a Web Project
