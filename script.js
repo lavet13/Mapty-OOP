@@ -45,9 +45,14 @@ class Workout {
         )} on ${getMonth(date)} ${getDate(date)}`;
     }
 
-    addMarkToMap(map) {
+    addMarkToMap() {
+        console.log(App.getMap()); // it will be undefined as we trying to get map
+        // that isn't created yet(first glimpse of asynchronous JavaScript),
+        // so it's not created right at the beginning when the application is first loaded.
+        // so it takes some time.
+
         L.marker(this.coords)
-            .addTo(map)
+            .addTo(App.getMap())
             .bindPopup(
                 L.popup({
                     maxWidth: 250,
@@ -67,7 +72,6 @@ class Workout {
     }
 
     render() {
-        console.log(typeof this.type);
         const html = `
         <li class="workout workout--${this._setProperty.call(
             this.type,
@@ -101,8 +105,8 @@ class Workout {
                         'min/km',
                         'km/h'
                     )}</span>
-                </div>
-                <div class="workout__details">
+            </div>
+            <div class="workout__details">
                     <span class="workout__icon">${this._setProperty.call(
                         this.type,
                         '🦶🏼',
@@ -118,8 +122,10 @@ class Workout {
                         'spm',
                         'm'
                     )}</span>
-                </div>
-            </li>`;
+            </div>
+            <button class="btn btn--edit">📝</button>
+            <button class="btn btn--del">❌</button>
+        </li>`;
 
         form.insertAdjacentHTML('afterend', html);
         return this;
@@ -165,16 +171,14 @@ class Cycling extends Workout {
 class App {
     static workouts = [];
     static #id = 0n;
-    #map;
-    #mapEvent;
-    #mapZoomLevel = 13;
+    static #map;
+    static #mapEvent;
+    static #mapZoomLevel = 13;
 
     constructor() {
         // basically every small piece of functionality that is in our application, we now
         // want to be it's own function.
         this._getPosition();
-
-        this._getLocalStorage();
 
         form.addEventListener('submit', this._newWorkout.bind(this));
         inputType.addEventListener('change', this._toggleElevationField);
@@ -184,8 +188,9 @@ class App {
         );
     }
 
+    // COUNTER
     static #countingObjects() {
-        return String(App.#id++);
+        return String(this.#id++);
     }
 
     static setId(id) {
@@ -194,6 +199,29 @@ class App {
 
     static getId() {
         return this.#id;
+    }
+
+    // MAP
+    static getMap() {
+        return this.#map;
+    }
+
+    static setMap(map) {
+        this.#map = map;
+    }
+
+    // MAP_EVENT
+    static getMapEvent() {
+        return this.#mapEvent;
+    }
+
+    static setMapEvent(mapE) {
+        this.#mapEvent = mapE;
+    }
+
+    // MAP_ZOOM
+    static getMapZoomLevel() {
+        return this.#mapZoomLevel;
     }
 
     _getPosition() {
@@ -219,20 +247,21 @@ class App {
 
         // if we doesn't set the this keyword manually, we will get an undefined
         // console.log(this);
-        this.#map = L.map('map').setView(coords, this.#mapZoomLevel);
+        App.setMap(L.map('map').setView(coords, App.getMapZoomLevel()));
 
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution:
                 '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        }).addTo(this.#map);
+        }).addTo(App.getMap());
 
-        this.#map.on('click', this._showForm.bind(this));
+        App.getMap().on('click', this._showForm.bind(this));
+        this._getLocalStorage();
     }
 
     _showForm(mapE) {
         form.classList.remove('hidden');
         inputDistance.focus();
-        this.#mapEvent = mapE;
+        App.setMapEvent(mapE);
     }
 
     _toggleElevationField(e) {
@@ -269,7 +298,7 @@ class App {
         const validInputsNumbers = (...inputs) =>
             inputs.every(input => Number.isFinite(+input));
 
-        const { lat: latitude, lng: longitude } = this.#mapEvent.latlng;
+        const { lat: latitude, lng: longitude } = App.getMapEvent().latlng;
         const coords = [latitude, longitude];
         const type = inputType.value,
             distance = inputDistance.value,
@@ -289,9 +318,9 @@ class App {
 
             App.workouts.push(
                 new Running(distance, duration, coords, cadence)
-                    .render()
-                    .addMarkToMap(this.#map)
                     .setId(App.#countingObjects())
+                    .render()
+                    .addMarkToMap()
             );
         }
 
@@ -309,9 +338,9 @@ class App {
 
             App.workouts.push(
                 new Cycling(distance, duration, coords, elevationGain)
-                    .render()
-                    .addMarkToMap(this.#map)
                     .setId(App.#countingObjects())
+                    .render()
+                    .addMarkToMap()
             );
         }
 
@@ -323,28 +352,106 @@ class App {
         const closest = e.target.closest('.workout');
         if (!closest) return; // if we get null, we'll get out of the event handler function
 
+        if (this._editWorkout(e)) return;
+        if (this._delWorkout(e)) return;
+
         const options = {
             animate: true,
             duration: 0.5,
         };
 
         const workout = App.workouts.find(({ id }) => {
-            console.log(id);
             return id === closest.dataset.id;
         });
 
-        this.#map.panTo(workout.coords, options);
+        // console.log(workout); // if it didn't find workout then it would be undefined
+        workout && App.getMap().panTo(workout.coords, options);
+        workout ?? alert(`can't find the workout`);
     }
 
+    _editWorkout(e) {
+        if (!e.target.matches('.btn--edit')) return false;
+
+        // const getDetails = details => {
+        //     let string = ``;
+
+        //     details.forEach(detail => {
+        //         string += detail.outerHTML;
+        //     });
+
+        //     return string;
+        // };
+
+        const workout = e.target.closest('.workout'); // form has to be outside of the workout
+
+        const data = {
+            description: workout.querySelector('.workout__title'),
+            details: workout.querySelectorAll('.workout__details'),
+            id: workout.dataset.id,
+        };
+
+        let string = ``;
+
+        const arrDetail = [
+            ['distance', 'km'],
+            ['duration', 'min'],
+            ['cadence', 'step/min'],
+            ['elevation', 'meters'],
+        ];
+
+        data.details.forEach((detail, i) => {
+            const [icon, value, unit] = detail.children;
+            const [type, placeholder] = arrDetail[i];
+
+            string += `<div class="workout__details">
+                <span class="workout__icon">${icon.textContent}</span>
+                <input class="form__input form__input--${type}" placeholder="${placeholder}" value="${value.textContent}">
+                <span class="workout__unit">${unit.textContent}</span>
+            </div>`;
+        });
+
+        console.log(string);
+
+        // console.dir(data.description.nodeName.toUpperCase()); // h2
+        // console.dir(data.description.textContent); // content
+
+        workout.replaceChildren();
+
+        workout.insertAdjacentHTML(
+            'beforeend',
+            `
+            ${data.description.outerHTML}
+        `
+        );
+
+        return true;
+    }
+
+    _delWorkout(e) {
+        if (!e.target.matches('.btn--del')) return false;
+
+        const workout = e.target.closest('.workout');
+
+        return true;
+    }
+
+    // local storage is a very simple API. And so it is only advised to use for small amounts
+    // of data, all right. That's because local storage is blocking. It's something that's
+    // very bad, and we will learn why that is. But for now, what matters here is that you
+    // shouldn't use local storage to store large amounts of data, because that will surely
+    // slow down your application.
     _setLocalStorage() {
         localStorage.setItem('workouts', JSON.stringify(App.workouts));
         localStorage.setItem('currentId', App.getId());
     }
 
     _getLocalStorage() {
-        console.log(this);
+        // undefined
+        console.dir(App.getMap());
+
         if (localStorage.getItem('workouts')) {
             App.workouts = JSON.parse(localStorage.getItem('workouts'));
+
             localStorage.getItem('currentId') &&
                 App.setId(BigInt(localStorage.getItem('currentId')));
 
@@ -355,7 +462,10 @@ class App {
                         workout.duration,
                         workout.coords,
                         workout.cadence
-                    ).render();
+                    )
+                        .setId(workout.id)
+                        .render()
+                        .addMarkToMap();
                 }
                 if (workout.type === 'cycling') {
                     new Cycling(
@@ -363,10 +473,19 @@ class App {
                         workout.duration,
                         workout.coords,
                         workout.elevationGain
-                    ).render();
+                    )
+                        .setId(workout.id)
+                        .render()
+                        .addMarkToMap();
                 }
             });
         }
+    }
+
+    static reset() {
+        localStorage.removeItem('workouts');
+        localStorage.removeItem('currentId');
+        location.reload();
     }
 }
 
@@ -375,7 +494,7 @@ class App {
 // building a library for some other people to use, then we could allow these developers
 // to customize the library, using some options. But again does just not necessary in this
 // case, all right? NOIDONTTHINKSO
-const map = new App();
+new App();
 
 //////////////////////////////////////////////////////
 // How to Plan a Web Project

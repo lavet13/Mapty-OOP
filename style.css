@@ -179,6 +179,34 @@ a:visited {
     display: none;
 }
 
+.btn {
+    display: inline-block;
+    font-family: inherit;
+    font-size: 1.4rem;
+    border: 0;
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn--edit {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.btn--edit:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.btn--del {
+    background: rgba(255, 0, 0, 0.05);
+}
+
+.btn--del:hover {
+    background: rgba(255, 0, 0, 0.35);
+}
+
 .copyright {
     margin-top: auto;
     font-size: 1.3rem;
