@@ -128,6 +128,12 @@ a:visited {
     transition: all 0.5s, transform 1ms;
 }
 
+.form--edit {
+    display: grid;
+    gap: 1.5rem 0;
+    grid-column: 1 / -1;
+}
+
 .form.hidden {
     transform: translateY(-30rem);
     height: 0;
@@ -205,6 +211,26 @@ a:visited {
 
 .btn--del:hover {
     background: rgba(255, 0, 0, 0.35);
+}
+
+.btn--submit {
+    color: #eee;
+    background: rgba(0, 255, 0, 0.15);
+}
+
+.btn--submit:hover {
+    background: rgba(0, 255, 0, 0.35);
+    color: #fff;
+}
+
+.btn--cancel {
+    color: #eee;
+    background: rgba(200, 20, 0, 0.15);
+}
+
+.btn--cancel:hover {
+    color: #fff;
+    background: rgba(220, 20, 0, 0.3);
 }
 
 .copyright {

@@ -46,7 +46,7 @@ class Workout {
     }
 
     addMarkToMap() {
-        console.log(App.getMap()); // it will be undefined as we trying to get map
+        // console.log(App.getMap()); // it will be undefined as we trying to get map
         // that isn't created yet(first glimpse of asynchronous JavaScript),
         // so it's not created right at the beginning when the application is first loaded.
         // so it takes some time.
@@ -189,7 +189,7 @@ class App {
     }
 
     // COUNTER
-    static #countingObjects() {
+    static #incrementId() {
         return String(this.#id++);
     }
 
@@ -318,7 +318,7 @@ class App {
 
             App.workouts.push(
                 new Running(distance, duration, coords, cadence)
-                    .setId(App.#countingObjects())
+                    .setId(App.#incrementId())
                     .render()
                     .addMarkToMap()
             );
@@ -338,7 +338,7 @@ class App {
 
             App.workouts.push(
                 new Cycling(distance, duration, coords, elevationGain)
-                    .setId(App.#countingObjects())
+                    .setId(App.#incrementId())
                     .render()
                     .addMarkToMap()
             );
@@ -354,6 +354,9 @@ class App {
 
         if (this._editWorkout(e)) return;
         if (this._delWorkout(e)) return;
+        if (this._input(e)) return;
+        if (this._submitWorkout(e)) return;
+        if (this._cancelWorkout(e)) return;
 
         const options = {
             animate: true,
@@ -372,16 +375,6 @@ class App {
     _editWorkout(e) {
         if (!e.target.matches('.btn--edit')) return false;
 
-        // const getDetails = details => {
-        //     let string = ``;
-
-        //     details.forEach(detail => {
-        //         string += detail.outerHTML;
-        //     });
-
-        //     return string;
-        // };
-
         const workout = e.target.closest('.workout'); // form has to be outside of the workout
 
         const data = {
@@ -391,38 +384,75 @@ class App {
         };
 
         let string = ``;
+        string += `${data.description.outerHTML}<form class="form--edit">`;
 
-        const arrDetail = [
-            ['distance', 'km'],
-            ['duration', 'min'],
-            ['cadence', 'step/min'],
-            ['elevation', 'meters'],
-        ];
+        const arrDetail = new Map([
+            ['km', 'distance'],
+            ['min', 'duration'],
+            ['spm', 'cadence'],
+            ['m', 'elevation'],
+        ]);
 
-        data.details.forEach((detail, i) => {
+        const placeholders = [...arrDetail.keys()];
+
+        for (const [i, detail] of data.details.entries()) {
             const [icon, value, unit] = detail.children;
-            const [type, placeholder] = arrDetail[i];
+
+            const getType = type => arrDetail.get(type);
+
+            if (i === data.details.length - 2) continue;
 
             string += `<div class="workout__details">
                 <span class="workout__icon">${icon.textContent}</span>
-                <input class="form__input form__input--${type}" placeholder="${placeholder}" value="${value.textContent}">
+                <input class="form__input form__input--${getType(
+                    unit.textContent
+                )}" placeholder="${placeholders[i]}" value="${
+                value.textContent
+            }" name="${getType(unit.textContent)}">
                 <span class="workout__unit">${unit.textContent}</span>
             </div>`;
-        });
+        }
 
-        console.log(string);
-
-        // console.dir(data.description.nodeName.toUpperCase()); // h2
-        // console.dir(data.description.textContent); // content
+        string += `<button class="btn btn--submit">Submit</button><button class="btn btn--cancel">❌</button></form>`;
 
         workout.replaceChildren();
 
-        workout.insertAdjacentHTML(
-            'beforeend',
-            `
-            ${data.description.outerHTML}
-        `
-        );
+        workout.insertAdjacentHTML('beforeend', string);
+
+        return true;
+    }
+
+    _submitWorkout(e) {
+        e.preventDefault();
+
+        if (!e.target.matches('.btn--submit')) return false;
+
+        const allPositive = (...inputs) => inputs.every(input => +input > 0);
+
+        const isFilledInputs = (...inputs) =>
+            inputs.every(input => input !== '');
+
+        const validInputsNumbers = (...inputs) =>
+            inputs.every(input => Number.isFinite(+input));
+
+        const form = e.target.parentElement;
+        const data = Object.fromEntries(new FormData(form).entries());
+        const type = App.workouts.find(
+            workout =>
+                workout.id === e.target.parentElement.parentElement.dataset.id
+        ).type; // string === string
+
+        return true;
+    }
+
+    _cancelWorkout(e) {
+        if (!e.target.matches('.btn--cancel')) return false;
+
+        return true;
+    }
+
+    _input(e) {
+        if (!e.target.matches('.form__input')) return false;
 
         return true;
     }
@@ -431,7 +461,32 @@ class App {
         if (!e.target.matches('.btn--del')) return false;
 
         const workout = e.target.closest('.workout');
+        const id = workout.dataset.id;
 
+        const deleteWorkout = (coords, otherCoords, event, id) => {
+            for (const [i, coord] of coords.entries()) {
+                console.log(coord, otherCoords[i]);
+                if (coord !== otherCoords[i]) return false;
+            }
+
+            event.remove();
+            App.workouts.splice(id, 1);
+            workout.remove();
+            return true;
+        };
+
+        const coords = App.workouts.find(workout => workout.id === id).coords;
+        const targets = Object.entries(App.getMap()._targets);
+
+        for (const [i, event] of targets) {
+            if (event._latlng) {
+                const { lat, lng } = event._latlng;
+                const otherCoords = [lat, lng];
+                if (deleteWorkout(coords, otherCoords, event, id)) break;
+            }
+        }
+
+        this._setLocalStorage();
         return true;
     }
 
@@ -447,7 +502,7 @@ class App {
 
     _getLocalStorage() {
         // undefined
-        console.dir(App.getMap());
+        // console.dir(App.getMap());
 
         if (localStorage.getItem('workouts')) {
             App.workouts = JSON.parse(localStorage.getItem('workouts'));
