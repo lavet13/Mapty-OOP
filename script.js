@@ -375,12 +375,12 @@ class App {
     _editWorkout(e) {
         if (!e.target.matches('.btn--edit')) return false;
 
-        const workout = e.target.closest('.workout'); // form has to be outside of the workout
+        const workoutContainer = e.target.closest('.workout'); // form has to be outside of the workout
 
         const data = {
-            description: workout.querySelector('.workout__title'),
-            details: workout.querySelectorAll('.workout__details'),
-            id: workout.dataset.id,
+            description: workoutContainer.querySelector('.workout__title'),
+            details: workoutContainer.querySelectorAll('.workout__details'),
+            id: workoutContainer.dataset.id,
         };
 
         let string = ``;
@@ -407,6 +407,7 @@ class App {
                 <input class="form__input form__input--${getType(
                     unit.textContent
                 )}" placeholder="${placeholders[i]}" value="${
+                // FIXME
                 value.textContent
             }" name="${getType(unit.textContent)}">
                 <span class="workout__unit">${unit.textContent}</span>
@@ -415,9 +416,9 @@ class App {
 
         string += `<button class="btn btn--submit">Submit</button><button class="btn btn--cancel">❌</button></form>`;
 
-        workout.replaceChildren();
+        workoutContainer.replaceChildren();
 
-        workout.insertAdjacentHTML('beforeend', string);
+        workoutContainer.insertAdjacentHTML('beforeend', string);
 
         return true;
     }
@@ -427,6 +428,11 @@ class App {
 
         if (!e.target.matches('.btn--submit')) return false;
 
+        const workoutContainer = e.target.closest('.workout');
+        const [firstInput, secondInput, thirdInput] =
+            workoutContainer.querySelectorAll('.form__input');
+        console.log(firstInput, secondInput, thirdInput);
+
         const allPositive = (...inputs) => inputs.every(input => +input > 0);
 
         const isFilledInputs = (...inputs) =>
@@ -435,12 +441,32 @@ class App {
         const validInputsNumbers = (...inputs) =>
             inputs.every(input => Number.isFinite(+input));
 
-        const form = e.target.parentElement;
-        const data = Object.fromEntries(new FormData(form).entries());
-        const type = App.workouts.find(
-            workout =>
-                workout.id === e.target.parentElement.parentElement.dataset.id
-        ).type; // string === string
+        const data = {
+            id: workoutContainer.dataset.id,
+            form: Object.fromEntries(
+                new FormData(e.target.parentElement).entries()
+            ),
+            details: workoutContainer.querySelectorAll('.workout__details'),
+        };
+
+        let string = ``;
+        string += `${e.target.parentElement.previousElementSibling.outerHTML}`;
+
+        for (const [i, detail] of data.details.entries()) {
+            const [icon, , unit] = detail.children;
+            const [, value] = Object.entries(data.form)[i];
+
+            string += `
+                <div class="workout__details">
+                    <span class="workout__icon">${icon.textContent}</span>
+                    <span class="workout__value">${value}</span>
+                    <span class="workout__unit">${unit.textContent}</span>
+                </div>
+            `;
+        }
+
+        workoutContainer.replaceChildren();
+        workoutContainer.insertAdjacentHTML('beforeend', string);
 
         return true;
     }
@@ -462,21 +488,23 @@ class App {
 
         const workout = e.target.closest('.workout');
         const id = workout.dataset.id;
+        const coords = App.workouts.find(workout => workout.id === id).coords;
+        const targets = Object.entries(App.getMap()._targets);
 
         const deleteWorkout = (coords, otherCoords, event, id) => {
             for (const [i, coord] of coords.entries()) {
-                console.log(coord, otherCoords[i]);
                 if (coord !== otherCoords[i]) return false;
             }
 
             event.remove();
-            App.workouts.splice(id, 1);
+            App.workouts.splice(
+                App.workouts.findIndex(({ id: idWorkout }) => idWorkout === id),
+                1
+            );
+
             workout.remove();
             return true;
         };
-
-        const coords = App.workouts.find(workout => workout.id === id).coords;
-        const targets = Object.entries(App.getMap()._targets);
 
         for (const [i, event] of targets) {
             if (event._latlng) {
