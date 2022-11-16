@@ -383,6 +383,8 @@ class App {
             id: workoutContainer.dataset.id,
         };
 
+        const type = App.workouts.find(workout => workout.id === data.id).type;
+
         let string = ``;
         string += `${data.description.outerHTML}<form class="form--edit">`;
 
@@ -392,6 +394,12 @@ class App {
             ['spm', 'cadence'],
             ['m', 'elevation'],
         ]);
+
+        const getTypeWorkout = (type, placeholders) => {
+            return type === 'running'
+                ? placeholders.at(-2)
+                : placeholders.at(-1);
+        };
 
         const placeholders = [...arrDetail.keys()];
 
@@ -406,10 +414,11 @@ class App {
                 <span class="workout__icon">${icon.textContent}</span>
                 <input class="form__input form__input--${getType(
                     unit.textContent
-                )}" placeholder="${placeholders[i]}" value="${
-                // FIXME
-                value.textContent
-            }" name="${getType(unit.textContent)}">
+                )}" placeholder="${
+                i === data.details.length - 1
+                    ? getTypeWorkout(type, placeholders)
+                    : placeholders[i]
+            }" value="${value.textContent}" name="${getType(unit.textContent)}">
                 <span class="workout__unit">${unit.textContent}</span>
             </div>`;
         }
@@ -429,9 +438,35 @@ class App {
         if (!e.target.matches('.btn--submit')) return false;
 
         const workoutContainer = e.target.closest('.workout');
-        const [firstInput, secondInput, thirdInput] =
-            workoutContainer.querySelectorAll('.form__input');
-        console.log(firstInput, secondInput, thirdInput);
+
+        const data = {
+            id: workoutContainer.dataset.id,
+
+            form: Object.fromEntries(
+                new FormData(e.target.parentElement).entries()
+            ),
+
+            details: workoutContainer.querySelectorAll('.workout__details'),
+        };
+
+        workoutContainer.remove();
+
+        const f = async function () {
+            return await new Promise(resolve => {
+                resolve();
+            });
+        };
+
+        f().then();
+
+        const workout = App.workouts.find(workout => workout.id === data.id);
+
+        App.workouts.splice(
+            App.workouts.findIndex(workout => workout.id === data.id),
+            1
+        );
+
+        console.log(data.form);
 
         const allPositive = (...inputs) => inputs.every(input => +input > 0);
 
@@ -441,33 +476,57 @@ class App {
         const validInputsNumbers = (...inputs) =>
             inputs.every(input => Number.isFinite(+input));
 
-        const data = {
-            id: workoutContainer.dataset.id,
-            form: Object.fromEntries(
-                new FormData(e.target.parentElement).entries()
-            ),
-            details: workoutContainer.querySelectorAll('.workout__details'),
-        };
+        if (workout.type === 'running') {
+            const { distance, duration, cadence } = data.form;
 
-        let string = ``;
-        string += `${e.target.parentElement.previousElementSibling.outerHTML}`;
+            if (!isFilledInputs(distance, duration, cadence)) {
+                alert('Inputs have to be filled!');
+                return true;
+            }
 
-        for (const [i, detail] of data.details.entries()) {
-            const [icon, , unit] = detail.children;
-            const [, value] = Object.entries(data.form)[i];
+            if (!validInputsNumbers(distance, duration, cadence)) {
+                alert('Inputs have to be THE numbers!');
+                return true;
+            }
 
-            string += `
-                <div class="workout__details">
-                    <span class="workout__icon">${icon.textContent}</span>
-                    <span class="workout__value">${value}</span>
-                    <span class="workout__unit">${unit.textContent}</span>
-                </div>
-            `;
+            if (!allPositive(distance, duration, cadence)) {
+                alert('Inputs have to be positive numbers!');
+                return true;
+            }
+
+            App.workouts.push(
+                new Running(distance, duration, workout.coords, cadence)
+                    .setId(data.id)
+                    .render()
+            );
         }
 
-        workoutContainer.replaceChildren();
-        workoutContainer.insertAdjacentHTML('beforeend', string);
+        if (workout.type === 'cycling') {
+            const { distance, duration, elevation } = data.form;
 
+            if (!isFilledInputs(distance, duration, elevation)) {
+                alert('Inputs have to be filled!');
+                return true;
+            }
+
+            if (!validInputsNumbers(distance, duration, elevation)) {
+                alert('Inputs have to be THE numbers!');
+                return true;
+            }
+
+            if (!allPositive(distance, duration)) {
+                alert('Inputs have to be positive numbers!');
+                return true;
+            }
+
+            App.workouts.push(
+                new Cycling(distance, duration, workout.coords, elevation)
+                    .setId(data.id)
+                    .render()
+            );
+        }
+
+        this._setLocalStorage();
         return true;
     }
 
@@ -491,12 +550,12 @@ class App {
         const coords = App.workouts.find(workout => workout.id === id).coords;
         const targets = Object.entries(App.getMap()._targets);
 
-        const deleteWorkout = (coords, otherCoords, event, id) => {
+        const deleteWorkout = ({ coords, otherCoords, marker, id }) => {
             for (const [i, coord] of coords.entries()) {
                 if (coord !== otherCoords[i]) return false;
             }
 
-            event.remove();
+            marker.remove();
             App.workouts.splice(
                 App.workouts.findIndex(({ id: idWorkout }) => idWorkout === id),
                 1
@@ -506,11 +565,13 @@ class App {
             return true;
         };
 
-        for (const [i, event] of targets) {
+        for (const [_, event] of targets) {
+            console.log(_, event);
             if (event._latlng) {
                 const { lat, lng } = event._latlng;
                 const otherCoords = [lat, lng];
-                if (deleteWorkout(coords, otherCoords, event, id)) break;
+                if (deleteWorkout({ coords, otherCoords, marker: event, id }))
+                    break;
             }
         }
 
