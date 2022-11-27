@@ -123,8 +123,8 @@ class Workout {
                         'm'
                     )}</span>
             </div>
-            <button class="btn btn--edit">📝</button>
-            <button class="btn btn--del">❌</button>
+            <button class="btn btn--edit"><span>📝</span>Edit</button>
+            <button class="btn btn--del"><span>❌</span>Delete</button>
         </li>`;
 
         form.insertAdjacentHTML('afterend', html);
@@ -232,6 +232,7 @@ class App {
         // once that it gets the currentPosition of the user. And when it calls this method,
         // then it does so, as a regular function call. And as we learned before, in a
         // regular function call, the this keyword is set to undefined.
+
         navigator.geolocation.getCurrentPosition(
             this._loadMap.bind(this),
             () => {
@@ -410,8 +411,10 @@ class App {
 
             if (i === data.details.length - 2) continue;
 
-            string += `<div class="workout__details">
-                <span class="workout__icon">${icon.textContent}</span>
+            string += `<div class="workout__details workout__details--edit">
+                <span class="workout__icon workout__icon--edit">${
+                    icon.textContent
+                }</span>
                 <input class="form__input form__input--${getType(
                     unit.textContent
                 )}" placeholder="${
@@ -423,7 +426,7 @@ class App {
             </div>`;
         }
 
-        string += `<button class="btn btn--submit">Submit</button><button class="btn btn--cancel">❌</button></form>`;
+        string += `<div class="buttons"><button class="btn btn--submit">Submit</button><button class="btn btn--cancel">Cancel</button></div></form>`;
 
         workoutContainer.replaceChildren();
 
@@ -443,21 +446,11 @@ class App {
             id: workoutContainer.dataset.id,
 
             form: Object.fromEntries(
-                new FormData(e.target.parentElement).entries()
+                new FormData(e.target.parentElement.parentElement).entries()
             ),
-
-            details: workoutContainer.querySelectorAll('.workout__details'),
         };
 
         workoutContainer.remove();
-
-        const f = async function () {
-            return await new Promise(resolve => {
-                resolve();
-            });
-        };
-
-        f().then();
 
         const workout = App.workouts.find(workout => workout.id === data.id);
 
@@ -533,6 +526,49 @@ class App {
     _cancelWorkout(e) {
         if (!e.target.matches('.btn--cancel')) return false;
 
+        const workoutContainer = e.target.closest('.workout');
+
+        const data = {
+            id: workoutContainer.dataset.id,
+        };
+
+        workoutContainer.remove();
+
+        const workout = App.workouts.splice(
+            App.workouts.findIndex(workout => workout.id === data.id)
+        );
+
+        const [workoutObj] = workout;
+
+        if (workoutObj.type === 'running') {
+            console.log('kek1');
+            App.workouts.push(
+                new Running(
+                    workoutObj.distance,
+                    workoutObj.duration,
+                    workoutObj.coords,
+                    workoutObj.cadence
+                )
+                    .setId(workoutObj.id)
+                    .render()
+            );
+        }
+
+        if (workoutObj.type === 'cycling') {
+            console.log('kek2');
+            App.workouts.push(
+                new Cycling(
+                    workoutObj.distance,
+                    workoutObj.duration,
+                    workoutObj.coords,
+                    workoutObj.elevationGain
+                )
+                    .setId(workoutObj.id)
+                    .render()
+            );
+        }
+
+        this._setLocalStorage();
         return true;
     }
 
