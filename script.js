@@ -8,6 +8,14 @@ const inputDuration = document.querySelector('.form__input--duration');
 const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
 
+// SORT options
+let isSortAscending;
+let sortType = 'distance';
+
+// SORT BUTTON
+const sortBtn = document.querySelector('.btn--sort');
+const selectSort = document.querySelector('.sort-selector');
+
 class Workout {
     date = new Date().toISOString();
 
@@ -178,6 +186,7 @@ class App {
     constructor() {
         // basically every small piece of functionality that is in our application, we now
         // want to be it's own function.
+
         this._getPosition();
 
         form.addEventListener('submit', this._newWorkout.bind(this));
@@ -186,6 +195,8 @@ class App {
             'click',
             this._moveToPopup.bind(this)
         );
+        sortBtn.addEventListener('click', this._sort.bind(this));
+        selectSort.addEventListener('change', this._typeOfSort.bind(this));
     }
 
     // COUNTER
@@ -257,6 +268,8 @@ class App {
 
         App.getMap().on('click', this._showForm.bind(this));
         this._getLocalStorage();
+        this._hideElement(containerWorkouts, sortBtn);
+        this._hideElement(containerWorkouts, selectSort);
     }
 
     _showForm(mapE) {
@@ -271,6 +284,7 @@ class App {
         inputCadence
             .closest('.form__row')
             .classList.toggle('form__row--hidden');
+
         inputElevation
             .closest('.form__row')
             .classList.toggle('form__row--hidden');
@@ -347,6 +361,8 @@ class App {
 
         this._setLocalStorage();
         this._hideForm();
+        this._hideElement(containerWorkouts, sortBtn);
+        this._hideElement(containerWorkouts, selectSort);
     }
 
     _moveToPopup(e) {
@@ -386,8 +402,7 @@ class App {
 
         const type = App.workouts.find(workout => workout.id === data.id).type;
 
-        let string = ``;
-        string += `${data.description.outerHTML}<form class="form--edit">`;
+        let string = `${data.description.outerHTML}<form class="form--edit">`;
 
         const arrDetail = new Map([
             ['km', 'distance'],
@@ -611,8 +626,77 @@ class App {
             }
         }
 
+        this._hideElement(containerWorkouts, sortBtn);
+        this._hideElement(containerWorkouts, selectSort);
         this._setLocalStorage();
         return true;
+    }
+
+    _sort(e) {
+        e.preventDefault();
+
+        switch (sortType) {
+            case 'distance':
+                if ((isSortAscending = !isSortAscending)) {
+                    App.workouts.sort(({ distance: d1 }, { distance: d2 }) => {
+                        return d1 > d2 ? -1 : 1;
+                    });
+                } else {
+                    App.workouts.sort(({ distance: d1 }, { distance: d2 }) => {
+                        return d1 > d2 ? 1 : -1;
+                    });
+                }
+                break;
+
+            case 'duration':
+                if ((isSortAscending = !isSortAscending)) {
+                    App.workouts.sort(({ duration: d1 }, { duration: d2 }) => {
+                        return d1 > d2 ? -1 : 1;
+                    });
+                } else {
+                    App.workouts.sort(({ duration: d1 }, { duration: d2 }) => {
+                        return d1 > d2 ? 1 : -1;
+                    });
+                }
+                break;
+        }
+
+        containerWorkouts
+            .querySelectorAll('.workout')
+            .forEach(workout => workout.remove());
+
+        App.workouts.forEach(workout => {
+            if (workout.type === 'running') {
+                const { distance, duration, cadence, coords, id } = workout;
+                new Running(distance, duration, coords, cadence)
+                    .setId(id)
+                    .render();
+            }
+
+            if (workout.type === 'cycling') {
+                const { distance, duration, elevationGain, coords, id } =
+                    workout;
+                new Cycling(distance, duration, coords, elevationGain)
+                    .setId(id)
+                    .render();
+            }
+        });
+
+        this._setLocalStorage();
+    }
+
+    _typeOfSort(e) {
+        e.preventDefault();
+
+        sortType = e.target.value;
+    }
+
+    _hideElement(workouts, element) {
+        if (workouts.querySelectorAll('.workout').length < 2) {
+            element.style.display = 'none';
+        } else {
+            element.style.display = 'inline-block';
+        }
     }
 
     // local storage is a very simple API. And so it is only advised to use for small amounts
@@ -623,6 +707,7 @@ class App {
     _setLocalStorage() {
         localStorage.setItem('workouts', JSON.stringify(App.workouts));
         localStorage.setItem('currentId', App.getId());
+        localStorage.setItem('sort', isSortAscending);
     }
 
     _getLocalStorage() {
@@ -660,6 +745,10 @@ class App {
                 }
             });
         }
+
+        isSortAscending = localStorage.getItem('sort')
+            ? localStorage.getItem('sort')
+            : false;
     }
 
     static reset() {

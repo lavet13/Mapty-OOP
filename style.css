@@ -57,9 +57,10 @@ a:visited {
 
 .workouts {
     list-style: none;
-    height: 77vh;
     overflow-y: scroll;
     overflow-x: hidden;
+
+    padding-bottom: 2.5rem;
 }
 
 .workouts::-webkit-scrollbar {
@@ -213,7 +214,7 @@ a:visited {
     font-family: inherit;
     font-size: 1.4rem;
     border: 0;
-    border-radius: 4px;
+    border-radius: 0.4rem;
     padding: 0.5rem 1rem;
     background: transparent;
     cursor: pointer;
@@ -233,6 +234,50 @@ a:visited {
 
 .btn--edit:hover {
     background: rgba(255, 255, 255, 0.25);
+}
+
+.btn--sort {
+    margin-right: 1rem;
+}
+
+.sort-selector {
+    position: relative;
+    display: inline-block;
+    font-size: 1.4rem;
+    color: #fff;
+}
+
+.sort-selector .sort--type {
+    display: inline-block;
+    width: 20rem;
+    min-height: 3.5rem;
+    background: #353e44;
+    border-radius: 0.4rem;
+    border: none;
+    outline: none;
+    padding: 0.5rem 0.7rem;
+    cursor: pointer;
+    appearance: none;
+    font-family: inherit;
+    color: #fff;
+
+    transition: all 0.2s;
+}
+
+.sort-selector:hover .sort--type {
+    background: #404c53;
+}
+
+.sort-selector:after {
+    content: '';
+    display: inline-block;
+    border: 0.5rem solid transparent;
+    border-top-color: #222;
+
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+    border-radius: 0.2rem;
 }
 
 .btn--del {
@@ -316,4 +361,10 @@ a:visited {
 }
 .cycling-popup .leaflet-popup-content-wrapper {
     border-left: 5px solid var(--color-brand--1);
+}
+
+/* Modal */
+.modal {
+    display: flex;
+    justify-content: center;
 }
