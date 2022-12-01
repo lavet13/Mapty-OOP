@@ -16,6 +16,65 @@ let sortType = 'distance';
 const sortBtn = document.querySelector('.btn--sort');
 const selectSort = document.querySelector('.sort-selector');
 
+class ModalMessage {
+    static messages = [];
+    #modalContainer = document.querySelector('.modal');
+    #modalCloseBtn = this.#modalContainer.querySelector('.modal__btn-close');
+    #timeout;
+
+    constructor(msg) {
+        this._msg = msg;
+
+        this._insertMessage();
+        this.#modalCloseBtn.addEventListener(
+            'click',
+            this._closeModal.bind(this)
+        );
+
+        ModalMessage.messages.push(this);
+        if (ModalMessage.messages.length === 2)
+            ModalMessage.messages.splice(0, 1); // хз
+    }
+
+    _insertMessage() {
+        this.#modalContainer.querySelector('.modal__content') &&
+            this.#modalContainer.removeChild(
+                this.#modalContainer.lastElementChild
+            );
+
+        this.#modalContainer.insertAdjacentHTML(
+            'beforeend',
+            `<div class="modal__content">${this._msg}</div>`
+        );
+    }
+
+    cancelTimeout() {
+        clearTimeout(this.#timeout);
+    }
+
+    openModal() {
+        if (this.#modalContainer.matches('.hidden')) {
+            this.#modalContainer.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        Promise.resolve().then(
+            function () {
+                this.#timeout = setTimeout(this._closeModal.bind(this), 2000);
+            }.bind(this)
+        );
+    }
+
+    _closeModal(e) {
+        e?.preventDefault();
+
+        if (!this.#modalContainer.matches('.hidden')) {
+            this.#modalContainer.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+    }
+}
+
 class Workout {
     date = new Date().toISOString();
 
@@ -322,14 +381,29 @@ class App {
         if (type === 'running') {
             const cadence = inputCadence.value;
 
-            if (!isFilledInputs(distance, duration, cadence))
-                return alert('Inputs have to be filled!');
+            if (!isFilledInputs(distance, duration, cadence)) {
+                ModalMessage.messages.at(-1)?.cancelTimeout();
 
-            if (!validInputsNumbers(distance, duration, cadence))
-                return alert('Inputs have to be THE numbers!');
+                return new ModalMessage(
+                    'Inputs have to be filled!'
+                ).openModal();
+            }
 
-            if (!allPositive(distance, duration, cadence))
-                return alert('Inputs have to be positive numbers!');
+            if (!validInputsNumbers(distance, duration, cadence)) {
+                ModalMessage.messages.at(-1)?.cancelTimeout();
+
+                return new ModalMessage(
+                    'Inputs have to be THE numbers!'
+                ).openModal();
+            }
+
+            if (!allPositive(distance, duration, cadence)) {
+                ModalMessage.messages.at(-1)?.cancelTimeout();
+
+                return new ModalMessage(
+                    'Inputs have to be positive numbers!'
+                ).openModal();
+            }
 
             App.workouts.push(
                 new Running(distance, duration, coords, cadence)
@@ -342,14 +416,29 @@ class App {
         if (type === 'cycling') {
             const elevationGain = inputElevation.value;
 
-            if (!isFilledInputs(distance, duration, elevationGain))
-                return alert('Inputs have to be filled!');
+            if (!isFilledInputs(distance, duration, elevationGain)) {
+                ModalMessage.messages.at(-1)?.cancelTimeout();
 
-            if (!validInputsNumbers(distance, duration, elevationGain))
-                return alert('Inputs have to be THE numbers!');
+                return new ModalMessage(
+                    'Inputs have to be filled!'
+                ).openModal();
+            }
 
-            if (!allPositive(distance, duration))
-                return alert('Inputs have to be positive numbers!');
+            if (!validInputsNumbers(distance, duration, elevationGain)) {
+                ModalMessage.messages.at(-1)?.cancelTimeout();
+
+                return new ModalMessage(
+                    'Inputs have to be THE numbers!'
+                ).openModal();
+            }
+
+            if (!allPositive(distance, duration)) {
+                ModalMessage.messages.at(-1)?.cancelTimeout();
+
+                return new ModalMessage(
+                    'Inputs have to be positive numbers!'
+                ).openModal();
+            }
 
             App.workouts.push(
                 new Cycling(distance, duration, coords, elevationGain)
@@ -359,6 +448,8 @@ class App {
             );
         }
 
+        ModalMessage.messages.at(-1)?.cancelTimeout();
+        new ModalMessage('New workout created! 😌').openModal();
         this._setLocalStorage();
         this._hideForm();
         this._hideElement(containerWorkouts, sortBtn);
@@ -386,7 +477,9 @@ class App {
 
         // console.log(workout); // if it didn't find workout then it would be undefined
         workout && App.getMap().panTo(workout.coords, options);
-        workout ?? alert(`can't find the workout`);
+
+        ModalMessage.messages.at(-1)?.cancelTimeout();
+        workout ?? new ModalMessage(`can't find the workout ❌`).openModal();
     }
 
     _editWorkout(e) {
@@ -488,17 +581,22 @@ class App {
             const { distance, duration, cadence } = data.form;
 
             if (!isFilledInputs(distance, duration, cadence)) {
-                alert('Inputs have to be filled!');
+                ModalMessage.messages.at(-1)?.cancelTimeout();
+                new ModalMessage('Inputs have to be filled!').openModal();
                 return true;
             }
 
             if (!validInputsNumbers(distance, duration, cadence)) {
-                alert('Inputs have to be THE numbers!');
+                ModalMessage.messages.at(-1)?.cancelTimeout();
+                new ModalMessage('Inputs have to be THE numbers!').openModal();
                 return true;
             }
 
             if (!allPositive(distance, duration, cadence)) {
-                alert('Inputs have to be positive numbers!');
+                ModalMessage.messages.at(-1)?.cancelTimeout();
+                new ModalMessage(
+                    'Inputs have to be positive numbers!'
+                ).openModal();
                 return true;
             }
 
@@ -513,17 +611,22 @@ class App {
             const { distance, duration, elevation } = data.form;
 
             if (!isFilledInputs(distance, duration, elevation)) {
-                alert('Inputs have to be filled!');
+                ModalMessage.messages.at(-1)?.cancelTimeout();
+                new ModalMessage('Inputs have to be filled!').openModal();
                 return true;
             }
 
             if (!validInputsNumbers(distance, duration, elevation)) {
-                alert('Inputs have to be THE numbers!');
+                ModalMessage.messages.at(-1)?.cancelTimeout();
+                new ModalMessage('Inputs have to be THE numbers!').openModal();
                 return true;
             }
 
             if (!allPositive(distance, duration)) {
-                alert('Inputs have to be positive numbers!');
+                ModalMessage.messages.at(-1)?.cancelTimeout();
+                new ModalMessage(
+                    'Inputs have to be positive numbers!'
+                ).openModal();
                 return true;
             }
 
@@ -534,6 +637,8 @@ class App {
             );
         }
 
+        ModalMessage.messages.at(-1)?.cancelTimeout();
+        new ModalMessage('Workout submitted! 😳').openModal();
         this._setLocalStorage();
         return true;
     }
@@ -550,7 +655,8 @@ class App {
         workoutContainer.remove();
 
         const workout = App.workouts.splice(
-            App.workouts.findIndex(workout => workout.id === data.id)
+            App.workouts.findIndex(workout => workout.id === data.id),
+            1
         );
 
         const [workoutObj] = workout;
@@ -583,6 +689,8 @@ class App {
             );
         }
 
+        ModalMessage.messages.at(-1)?.cancelTimeout();
+        new ModalMessage('Canceled! HAha 🤔').openModal();
         this._setLocalStorage();
         return true;
     }
@@ -626,6 +734,8 @@ class App {
             }
         }
 
+        ModalMessage.messages.at(-1)?.cancelTimeout();
+        new ModalMessage('Workout deleted! 😚').openModal();
         this._hideElement(containerWorkouts, sortBtn);
         this._hideElement(containerWorkouts, selectSort);
         this._setLocalStorage();
@@ -754,6 +864,7 @@ class App {
     static reset() {
         localStorage.removeItem('workouts');
         localStorage.removeItem('currentId');
+        localStorage.removeItem('sort');
         location.reload();
     }
 }

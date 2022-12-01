@@ -365,6 +365,61 @@ a:visited {
 
 /* Modal */
 .modal {
+    position: fixed;
+    bottom: 10%;
+    right: 0;
+    transform: translate(-10%, -10%);
+    width: 50rem;
+    min-height: 8rem;
+    padding: 3rem;
+    margin: 0 2rem;
+    border-radius: 0.4rem;
+    background: var(--color-dark--1);
+
+    transition: 0.5s all;
+
+    z-index: 10000;
+}
+
+.modal.hidden {
+    transform: translate(50%, 200%) scale(0.6) rotate(-25deg);
+    visibility: hidden;
+    opacity: 0;
+    height: 0;
+    padding: 0 3rem;
+}
+
+.modal__btn-close {
+    position: absolute;
+    top: 0;
+    right: 0;
+
     display: flex;
-    justify-content: center;
+    align-items: center;
+    justify-items: center;
+
+    font-size: 4rem;
+    font-family: inherit;
+
+    cursor: pointer;
+    border: none;
+    border-bottom-left-radius: 4px;
+    background: transparent;
+    color: var(--color-dark--2);
+
+    padding: 0.5rem 1rem;
+    line-height: 0.7;
+    overflow: hidden;
+
+    transition: 0.2s all;
+}
+
+.modal__btn-close:hover {
+    background: rgba(66, 72, 77, 0.2);
+    color: rgba(100, 100, 100, 0.8);
+}
+
+.modal__content {
+    text-align: center;
+    font-size: 1.6rem;
 }
