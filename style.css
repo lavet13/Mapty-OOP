@@ -29,7 +29,6 @@ body {
     overscroll-behavior-y: none;
 
     background-color: #fff;
-    padding: 2.5rem;
 
     display: flex;
 }
@@ -382,7 +381,7 @@ a:visited {
 }
 
 .modal.hidden {
-    transform: translate(50%, 200%) scale(0.6) rotate(-25deg);
+    transform: translate(0, 200%) scale(0.6);
     visibility: hidden;
     opacity: 0;
     height: 0;

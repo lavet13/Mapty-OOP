@@ -18,31 +18,34 @@ const selectSort = document.querySelector('.sort-selector');
 
 class ModalMessage {
     static messages = [];
-    #modalContainer = document.querySelector('.modal');
-    #modalCloseBtn = this.#modalContainer.querySelector('.modal__btn-close');
+    static #modalContainer = document.querySelector('.modal');
+    static #modalCloseBtn =
+        ModalMessage.#modalContainer.querySelector('.modal__btn-close');
     #timeout;
 
-    constructor(msg) {
+    constructor(msg, seconds = 2) {
         this._msg = msg;
+        this._seconds = seconds;
 
         this._insertMessage();
-        this.#modalCloseBtn.addEventListener(
+        ModalMessage.#modalCloseBtn.addEventListener(
             'click',
             this._closeModal.bind(this)
         );
 
+        ModalMessage.messages.at(-1)?.cancelTimeout();
         ModalMessage.messages.push(this);
         if (ModalMessage.messages.length === 2)
-            ModalMessage.messages.splice(0, 1); // хз
+            ModalMessage.messages.splice(0, 1);
     }
 
     _insertMessage() {
-        this.#modalContainer.querySelector('.modal__content') &&
-            this.#modalContainer.removeChild(
-                this.#modalContainer.lastElementChild
+        ModalMessage.#modalContainer.querySelector('.modal__content') &&
+            ModalMessage.#modalContainer.removeChild(
+                ModalMessage.#modalContainer.querySelector('.modal__content')
             );
 
-        this.#modalContainer.insertAdjacentHTML(
+        ModalMessage.#modalContainer.insertAdjacentHTML(
             'beforeend',
             `<div class="modal__content">${this._msg}</div>`
         );
@@ -53,23 +56,22 @@ class ModalMessage {
     }
 
     openModal() {
-        if (this.#modalContainer.matches('.hidden')) {
-            this.#modalContainer.classList.remove('hidden');
+        if (ModalMessage.#modalContainer.matches('.hidden')) {
+            ModalMessage.#modalContainer.classList.remove('hidden');
             document.body.style.overflow = 'hidden';
         }
 
-        Promise.resolve().then(
-            function () {
-                this.#timeout = setTimeout(this._closeModal.bind(this), 2000);
-            }.bind(this)
+        this.#timeout = setTimeout(
+            this._closeModal.bind(this),
+            this._seconds * 1000
         );
     }
 
     _closeModal(e) {
         e?.preventDefault();
 
-        if (!this.#modalContainer.matches('.hidden')) {
-            this.#modalContainer.classList.add('hidden');
+        if (!ModalMessage.#modalContainer.matches('.hidden')) {
+            ModalMessage.#modalContainer.classList.add('hidden');
             document.body.style.overflow = '';
         }
     }
@@ -243,10 +245,24 @@ class App {
     static #mapZoomLevel = 13;
 
     constructor() {
-        // basically every small piece of functionality that is in our application, we now
-        // want to be it's own function.
+        (async () => {
+            try {
+                const position = await this.getPosition();
+                const { latitude, longitude } = position.coords;
 
-        this._getPosition();
+                this._loadMap(latitude, longitude);
+
+                await this.getWeather(
+                    `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m&hourly=weathercode&current_weather=true`
+                );
+                this._getLocalStorage();
+
+                this._hideElement(containerWorkouts, sortBtn);
+                this._hideElement(containerWorkouts, selectSort);
+            } catch (err) {
+                new ModalMessage(`${err.message}`, 10).openModal();
+            }
+        })();
 
         form.addEventListener('submit', this._newWorkout.bind(this));
         inputType.addEventListener('change', this._toggleElevationField);
@@ -294,28 +310,48 @@ class App {
         return this.#mapZoomLevel;
     }
 
-    _getPosition() {
-        // loadMap method called by getCurrentPosition function, and in fact this is actually
-        // treated as a regular function call, not as a method call.
-        // since this is a callback function, we are not calling it ourselves. It is the
-        // getCurrentPosition function that we'll call this callback function(loadMap)
-        // once that it gets the currentPosition of the user. And when it calls this method,
-        // then it does so, as a regular function call. And as we learned before, in a
-        // regular function call, the this keyword is set to undefined.
-
-        navigator.geolocation.getCurrentPosition(
-            this._loadMap.bind(this),
-            () => {
-                alert('Could not get your position');
-            }
-        );
+    getPosition() {
+        return new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject);
+        });
     }
 
-    _loadMap(position) {
-        const { latitude, longitude } = position.coords;
+    getJSON(url, msg = `Something went wrong`) {
+        return fetch(url)
+            .then(res => {
+                // if (!res.ok)
+                //     throw new Error(`${msg} status code: ${res.status}`);
 
-        const coords = [latitude, longitude];
+                return res.json();
+            })
+            .catch(err => {
+                console.error(err);
+            });
+    }
 
+    async getWeather(url) {
+        try {
+            // {
+            //     hourly_units: { temperature_2m: tempType },
+            //     hourly: { time, temperature_2m: temperature },
+            //     current_weather: { time: currentTime },
+            // }
+            const data = await this.getJSON(url, `Weather cannot be found!`);
+            console.log(data);
+
+            // const timeMap = new Map();
+
+            // time.forEach((t, index) => {
+            //     timeMap.set(t, temperature[index]);
+            // });
+
+            // console.log(timeMap.get(currentTime), tempType);
+        } catch (err) {
+            throw err;
+        }
+    }
+
+    _loadMap(...coords) {
         // if we doesn't set the this keyword manually, we will get an undefined
         // console.log(this);
         App.setMap(L.map('map').setView(coords, App.getMapZoomLevel()));
@@ -326,9 +362,6 @@ class App {
         }).addTo(App.getMap());
 
         App.getMap().on('click', this._showForm.bind(this));
-        this._getLocalStorage();
-        this._hideElement(containerWorkouts, sortBtn);
-        this._hideElement(containerWorkouts, selectSort);
     }
 
     _showForm(mapE) {
@@ -382,24 +415,18 @@ class App {
             const cadence = inputCadence.value;
 
             if (!isFilledInputs(distance, duration, cadence)) {
-                ModalMessage.messages.at(-1)?.cancelTimeout();
-
                 return new ModalMessage(
                     'Inputs have to be filled!'
                 ).openModal();
             }
 
             if (!validInputsNumbers(distance, duration, cadence)) {
-                ModalMessage.messages.at(-1)?.cancelTimeout();
-
                 return new ModalMessage(
                     'Inputs have to be THE numbers!'
                 ).openModal();
             }
 
             if (!allPositive(distance, duration, cadence)) {
-                ModalMessage.messages.at(-1)?.cancelTimeout();
-
                 return new ModalMessage(
                     'Inputs have to be positive numbers!'
                 ).openModal();
@@ -417,24 +444,18 @@ class App {
             const elevationGain = inputElevation.value;
 
             if (!isFilledInputs(distance, duration, elevationGain)) {
-                ModalMessage.messages.at(-1)?.cancelTimeout();
-
                 return new ModalMessage(
                     'Inputs have to be filled!'
                 ).openModal();
             }
 
             if (!validInputsNumbers(distance, duration, elevationGain)) {
-                ModalMessage.messages.at(-1)?.cancelTimeout();
-
                 return new ModalMessage(
                     'Inputs have to be THE numbers!'
                 ).openModal();
             }
 
             if (!allPositive(distance, duration)) {
-                ModalMessage.messages.at(-1)?.cancelTimeout();
-
                 return new ModalMessage(
                     'Inputs have to be positive numbers!'
                 ).openModal();
@@ -448,7 +469,6 @@ class App {
             );
         }
 
-        ModalMessage.messages.at(-1)?.cancelTimeout();
         new ModalMessage('New workout created! 😌').openModal();
         this._setLocalStorage();
         this._hideForm();
@@ -478,7 +498,6 @@ class App {
         // console.log(workout); // if it didn't find workout then it would be undefined
         workout && App.getMap().panTo(workout.coords, options);
 
-        ModalMessage.messages.at(-1)?.cancelTimeout();
         workout ?? new ModalMessage(`can't find the workout ❌`).openModal();
     }
 
@@ -581,19 +600,16 @@ class App {
             const { distance, duration, cadence } = data.form;
 
             if (!isFilledInputs(distance, duration, cadence)) {
-                ModalMessage.messages.at(-1)?.cancelTimeout();
                 new ModalMessage('Inputs have to be filled!').openModal();
                 return true;
             }
 
             if (!validInputsNumbers(distance, duration, cadence)) {
-                ModalMessage.messages.at(-1)?.cancelTimeout();
                 new ModalMessage('Inputs have to be THE numbers!').openModal();
                 return true;
             }
 
             if (!allPositive(distance, duration, cadence)) {
-                ModalMessage.messages.at(-1)?.cancelTimeout();
                 new ModalMessage(
                     'Inputs have to be positive numbers!'
                 ).openModal();
@@ -611,19 +627,16 @@ class App {
             const { distance, duration, elevation } = data.form;
 
             if (!isFilledInputs(distance, duration, elevation)) {
-                ModalMessage.messages.at(-1)?.cancelTimeout();
                 new ModalMessage('Inputs have to be filled!').openModal();
                 return true;
             }
 
             if (!validInputsNumbers(distance, duration, elevation)) {
-                ModalMessage.messages.at(-1)?.cancelTimeout();
                 new ModalMessage('Inputs have to be THE numbers!').openModal();
                 return true;
             }
 
             if (!allPositive(distance, duration)) {
-                ModalMessage.messages.at(-1)?.cancelTimeout();
                 new ModalMessage(
                     'Inputs have to be positive numbers!'
                 ).openModal();
@@ -637,7 +650,6 @@ class App {
             );
         }
 
-        ModalMessage.messages.at(-1)?.cancelTimeout();
         new ModalMessage('Workout submitted! 😳').openModal();
         this._setLocalStorage();
         return true;
@@ -662,7 +674,6 @@ class App {
         const [workoutObj] = workout;
 
         if (workoutObj.type === 'running') {
-            console.log('kek1');
             App.workouts.push(
                 new Running(
                     workoutObj.distance,
@@ -676,7 +687,6 @@ class App {
         }
 
         if (workoutObj.type === 'cycling') {
-            console.log('kek2');
             App.workouts.push(
                 new Cycling(
                     workoutObj.distance,
@@ -689,7 +699,6 @@ class App {
             );
         }
 
-        ModalMessage.messages.at(-1)?.cancelTimeout();
         new ModalMessage('Canceled! HAha 🤔').openModal();
         this._setLocalStorage();
         return true;
@@ -734,7 +743,6 @@ class App {
             }
         }
 
-        ModalMessage.messages.at(-1)?.cancelTimeout();
         new ModalMessage('Workout deleted! 😚').openModal();
         this._hideElement(containerWorkouts, sortBtn);
         this._hideElement(containerWorkouts, selectSort);
