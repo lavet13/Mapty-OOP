@@ -331,21 +331,68 @@ class App {
 
     async getWeather(url) {
         try {
-            // {
-            //     hourly_units: { temperature_2m: tempType },
-            //     hourly: { time, temperature_2m: temperature },
-            //     current_weather: { time: currentTime },
-            // }
+            const weatherInterpretation = new Map([
+                [0, 'Clear sky'],
+                [1, 'Mainly clear'],
+                [2, 'Partly clear'],
+                [3, 'Overcast'],
+                [45, 'Fog'],
+                [48, 'Depositing rime fog'],
+                [51, 'drizzle(light)'],
+                [53, 'drizzle(moderate)'],
+                [55, 'drizzle(dense)'],
+                [56, 'Freezing Drizzle(light)'],
+                [57, 'Freezing Drizzle(dense)'],
+                [61, 'Rain(slight)'],
+                [63, 'Rain(moderate)'],
+                [65, 'Rain(heavy)'],
+                [66, 'Freezing Rain(light)'],
+                [67, 'Freezing Rain(heavy)'],
+                [71, 'Snow fall(slight)'],
+                [73, 'Snow fall(moderate)'],
+                [75, 'Snow fall(heavy)'],
+                [77, 'Snow grains'],
+                [80, 'Rain showers(slight)'],
+                [81, 'Rain showers(moderate)'],
+                [82, 'Rain showers(violent)'],
+                [85, 'Snow showers(slight)'],
+                [86, 'Snow showers(heavy)'],
+                [95, 'Thunderstorm(slight)'],
+                [96, 'Thunderstorm(slight hail)'],
+                [99, 'Thunderstorm(heavy hail)'],
+            ]);
+
             const data = await this.getJSON(url, `Weather cannot be found!`);
+
+            const {
+                hourly_units: { temperature_2m: tempType },
+                hourly: {
+                    time: timeArray,
+                    temperature_2m: temperatureArray,
+                    weathercode: weatherCodeArray,
+                },
+                current_weather: { time: currentTime },
+            } = data;
+
             console.log(data);
 
-            // const timeMap = new Map();
+            const timeMap = new Map();
 
-            // time.forEach((t, index) => {
-            //     timeMap.set(t, temperature[index]);
-            // });
+            timeArray.forEach((t, index) => {
+                timeMap.set(t, [
+                    temperatureArray[index],
+                    weatherCodeArray[index],
+                ]);
+            });
 
-            // console.log(timeMap.get(currentTime), tempType);
+            console.log(timeMap);
+
+            const [temperature, weatherCode] = timeMap.get(currentTime);
+
+            // console.log( temperature,
+            //     tempType,
+            //     weatherInterpretation.get(weatherCode)
+            // );
         } catch (err) {
             throw err;
         }
