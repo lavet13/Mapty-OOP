@@ -244,6 +244,37 @@ class App {
     static #mapEvent;
     static #mapZoomLevel = 13;
 
+    #weatherInterpretation = new Map([
+        [0, 'Clear sky'],
+        [1, 'Mainly clear'],
+        [2, 'Partly clear'],
+        [3, 'Overcast'],
+        [45, 'Fog'],
+        [48, 'Depositing rime fog'],
+        [51, 'drizzle(light)'],
+        [53, 'drizzle(moderate)'],
+        [55, 'drizzle(dense)'],
+        [56, 'Freezing Drizzle(light)'],
+        [57, 'Freezing Drizzle(dense)'],
+        [61, 'Rain(slight)'],
+        [63, 'Rain(moderate)'],
+        [65, 'Rain(heavy)'],
+        [66, 'Freezing Rain(light)'],
+        [67, 'Freezing Rain(heavy)'],
+        [71, 'Snow fall(slight)'],
+        [73, 'Snow fall(moderate)'],
+        [75, 'Snow fall(heavy)'],
+        [77, 'Snow grains'],
+        [80, 'Rain showers(slight)'],
+        [81, 'Rain showers(moderate)'],
+        [82, 'Rain showers(violent)'],
+        [85, 'Snow showers(slight)'],
+        [86, 'Snow showers(heavy)'],
+        [95, 'Thunderstorm(slight)'],
+        [96, 'Thunderstorm(slight hail)'],
+        [99, 'Thunderstorm(heavy hail)'],
+    ]);
+
     constructor() {
         (async () => {
             try {
@@ -252,13 +283,22 @@ class App {
 
                 this._loadMap(latitude, longitude);
 
-                await this.getWeather(
-                    `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m&hourly=weathercode&current_weather=true`
+                this.currentTime = await this.getTimeForWeather(
+                    `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`
                 );
+
+                await this.getWeather(
+                    `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m&hourly=weathercode`
+                );
+
                 this._getLocalStorage();
 
                 this._hideElement(containerWorkouts, sortBtn);
                 this._hideElement(containerWorkouts, selectSort);
+                this.timeUpdate({
+                    time: `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`,
+                    weather: `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m&hourly=weathercode`,
+                });
             } catch (err) {
                 new ModalMessage(`${err.message}`, 10).openModal();
             }
@@ -319,51 +359,44 @@ class App {
     getJSON(url, msg = `Something went wrong`) {
         return fetch(url)
             .then(res => {
-                // if (!res.ok)
-                //     throw new Error(`${msg} status code: ${res.status}`);
+                if (!res.ok)
+                    throw new Error(`${msg} status code: ${res.status}`);
 
                 return res.json();
             })
             .catch(err => {
-                console.error(err);
+                throw err;
             });
+    }
+
+    timeUpdate({ time, weather }) {
+        return new Promise(resolve => {
+            setInterval(async () => {
+                try {
+                    this.currentTime = await this.getTimeForWeather(time);
+                    await this.getWeather(weather);
+                    resolve();
+                } catch (err) {
+                    new ModalMessage(`${err.message}`, 10).openModal();
+                }
+            }, 1000 * 60 * 2); // 2 min
+        });
+    }
+
+    async getTimeForWeather(url) {
+        try {
+            const {
+                current_weather: { time: currentTime },
+            } = await this.getJSON(url, `Cannot get the time 😀`);
+
+            return currentTime;
+        } catch (err) {
+            throw err;
+        }
     }
 
     async getWeather(url) {
         try {
-            const weatherInterpretation = new Map([
-                [0, 'Clear sky'],
-                [1, 'Mainly clear'],
-                [2, 'Partly clear'],
-                [3, 'Overcast'],
-                [45, 'Fog'],
-                [48, 'Depositing rime fog'],
-                [51, 'drizzle(light)'],
-                [53, 'drizzle(moderate)'],
-                [55, 'drizzle(dense)'],
-                [56, 'Freezing Drizzle(light)'],
-                [57, 'Freezing Drizzle(dense)'],
-                [61, 'Rain(slight)'],
-                [63, 'Rain(moderate)'],
-                [65, 'Rain(heavy)'],
-                [66, 'Freezing Rain(light)'],
-                [67, 'Freezing Rain(heavy)'],
-                [71, 'Snow fall(slight)'],
-                [73, 'Snow fall(moderate)'],
-                [75, 'Snow fall(heavy)'],
-                [77, 'Snow grains'],
-                [80, 'Rain showers(slight)'],
-                [81, 'Rain showers(moderate)'],
-                [82, 'Rain showers(violent)'],
-                [85, 'Snow showers(slight)'],
-                [86, 'Snow showers(heavy)'],
-                [95, 'Thunderstorm(slight)'],
-                [96, 'Thunderstorm(slight hail)'],
-                [99, 'Thunderstorm(heavy hail)'],
-            ]);
-
-            const data = await this.getJSON(url, `Weather cannot be found!`);
-
             const {
                 hourly_units: { temperature_2m: tempType },
                 hourly: {
@@ -371,28 +404,26 @@ class App {
                     temperature_2m: temperatureArray,
                     weathercode: weatherCodeArray,
                 },
-                current_weather: { time: currentTime },
-            } = data;
+            } = await this.getJSON(url, `Weather cannot be found!`);
 
-            console.log(data);
-
-            const timeMap = new Map();
+            this.timeMap = new Map();
 
             timeArray.forEach((t, index) => {
-                timeMap.set(t, [
+                this.timeMap.set(t, [
                     temperatureArray[index],
                     weatherCodeArray[index],
                 ]);
             });
 
-            console.log(timeMap);
+            const [temperature, weatherCode] = this.timeMap.get(
+                this.currentTime
+            );
 
-            const [temperature, weatherCode] = timeMap.get(currentTime);
-
-            // console.log( temperature,
-            //     tempType,
-            //     weatherInterpretation.get(weatherCode)
-            // );
+            console.log(
+                temperature,
+                tempType,
+                this.#weatherInterpretation.get(weatherCode)
+            );
         } catch (err) {
             throw err;
         }
@@ -929,7 +960,7 @@ class App {
 // building a library for some other people to use, then we could allow these developers
 // to customize the library, using some options. But again does just not necessary in this
 // case, all right? NOIDONTTHINKSO
-new App();
+const app = new App();
 
 //////////////////////////////////////////////////////
 // How to Plan a Web Project
