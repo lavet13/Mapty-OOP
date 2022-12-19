@@ -163,37 +163,41 @@ class Workout {
                 <span class="workout__unit">min</span>
             </div>
             <div class="workout__details">
-                    <span class="workout__icon">⚡️</span>
-                    <span class="workout__value">${this._setProperty.call(
-                        this.type,
-                        this.pace,
-                        this.speed
-                    )}</span>
-                    <span class="workout__unit">${this._setProperty.call(
-                        this.type,
-                        'min/km',
-                        'km/h'
-                    )}</span>
+                <span class="workout__icon">⚡️</span>
+                <span class="workout__value">${this._setProperty.call(
+                    this.type,
+                    this.pace,
+                    this.speed
+                )}</span>
+                <span class="workout__unit">${this._setProperty.call(
+                    this.type,
+                    'min/km',
+                    'km/h'
+                )}</span>
             </div>
             <div class="workout__details">
-                    <span class="workout__icon">${this._setProperty.call(
-                        this.type,
-                        '🦶🏼',
-                        '⛰'
-                    )}</span>
-                    <span class="workout__value">${this._setProperty.call(
-                        this.type,
-                        this.cadence,
-                        this.elevationGain
-                    )}</span>
-                    <span class="workout__unit">${this._setProperty.call(
-                        this.type,
-                        'spm',
-                        'm'
-                    )}</span>
+                <span class="workout__icon">${this._setProperty.call(
+                    this.type,
+                    '🦶🏼',
+                    '⛰'
+                )}</span>
+                <span class="workout__value">${this._setProperty.call(
+                    this.type,
+                    this.cadence,
+                    this.elevationGain
+                )}</span>
+                <span class="workout__unit">${this._setProperty.call(
+                    this.type,
+                    'spm',
+                    'm'
+                )}</span>
             </div>
             <button class="btn btn--edit"><span>📝</span>Edit</button>
             <button class="btn btn--del"><span>❌</span>Delete</button>
+            <div class="workout__details">
+                <span class="workout__icon></span>
+                <span class="workout__value></span>
+            </div>
         </li>`;
 
         form.insertAdjacentHTML('afterend', html);
@@ -275,6 +279,14 @@ class App {
         [99, 'Thunderstorm(heavy hail)'],
     ]);
 
+    _timeForWeatherURL = function (latitude, longitude) {
+        return `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`;
+    };
+
+    _weatherURL = function (latitude, longitude) {
+        return `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m&hourly=weathercode`;
+    };
+
     constructor() {
         (async () => {
             try {
@@ -284,20 +296,19 @@ class App {
                 this._loadMap(latitude, longitude);
 
                 this.currentTime = await this.getTimeForWeather(
-                    `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`
+                    this._timeForWeatherURL(latitude, longitude)
                 );
 
-                await this.getWeather(
-                    `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m&hourly=weathercode`
-                );
+                await this.getWeather(this._weatherURL(latitude, longitude));
 
                 this._getLocalStorage();
 
                 this._hideElement(containerWorkouts, sortBtn);
                 this._hideElement(containerWorkouts, selectSort);
+
                 this.timeUpdate({
-                    time: `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`,
-                    weather: `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m&hourly=weathercode`,
+                    time: this._timeForWeatherURL(latitude, longitude),
+                    weather: this._weatherURL(latitude, longitude),
                 });
             } catch (err) {
                 new ModalMessage(`${err.message}`, 10).openModal();
@@ -356,17 +367,16 @@ class App {
         });
     }
 
-    getJSON(url, msg = `Something went wrong`) {
-        return fetch(url)
-            .then(res => {
-                if (!res.ok)
-                    throw new Error(`${msg} status code: ${res.status}`);
+    async getJSON(url, msg = `Something went wrong`) {
+        try {
+            const res = await fetch(url);
 
-                return res.json();
-            })
-            .catch(err => {
-                throw err;
-            });
+            if (!res.ok) throw new Error(`${msg} status code: ${res.status}`);
+
+            return await res.json();
+        } catch (err) {
+            throw err;
+        }
     }
 
     timeUpdate({ time, weather }) {
@@ -415,6 +425,8 @@ class App {
                 ]);
             });
 
+            console.log(timeMap);
+
             const [temperature, weatherCode] = this.timeMap.get(
                 this.currentTime
             );
@@ -422,7 +434,8 @@ class App {
             console.log(
                 temperature,
                 tempType,
-                this.#weatherInterpretation.get(weatherCode)
+                this.#weatherInterpretation.get(weatherCode),
+                this.currentTime
             );
         } catch (err) {
             throw err;
