@@ -194,10 +194,6 @@ class Workout {
             </div>
             <button class="btn btn--edit"><span>📝</span>Edit</button>
             <button class="btn btn--del"><span>❌</span>Delete</button>
-            <div class="workout__details">
-                <span class="workout__icon></span>
-                <span class="workout__value></span>
-            </div>
         </li>`;
 
         form.insertAdjacentHTML('afterend', html);
@@ -280,11 +276,11 @@ class App {
     ]);
 
     _timeForWeatherURL = function (latitude, longitude) {
-        return `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`;
+        return `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&timezone=Europe%2FMoscow`;
     };
 
     _weatherURL = function (latitude, longitude) {
-        return `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m&hourly=weathercode`;
+        return `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m&hourly=weathercode&timezone=Europe%2FMoscow`;
     };
 
     constructor() {
@@ -305,6 +301,8 @@ class App {
 
                 this._hideElement(containerWorkouts, sortBtn);
                 this._hideElement(containerWorkouts, selectSort);
+
+                this.renderWeather();
 
                 this.timeUpdate({
                     time: this._timeForWeatherURL(latitude, longitude),
@@ -405,7 +403,7 @@ class App {
         }
     }
 
-    async getWeather(url) {
+    async getDataWeather(url) {
         try {
             const {
                 hourly_units: { temperature_2m: tempType },
@@ -425,21 +423,41 @@ class App {
                 ]);
             });
 
-            console.log(timeMap);
+            this.tempType = tempType;
+
+            console.log(this.timeMap);
+        } catch (err) {
+            throw err;
+        }
+    }
+
+    async getWeather(url) {
+        try {
+            if (!this.timeMap) await this.getDataWeather(url);
 
             const [temperature, weatherCode] = this.timeMap.get(
                 this.currentTime
             );
 
-            console.log(
-                temperature,
-                tempType,
-                this.#weatherInterpretation.get(weatherCode),
-                this.currentTime
-            );
+            // console.log(
+            //     temperature,
+            //     this.tempType,
+            //     this.#weatherInterpretation.get(weatherCode),
+            //     this.currentTime
+            // );
         } catch (err) {
             throw err;
         }
+    }
+
+    renderWeather() {
+        containerWorkouts.querySelectorAll('.workout').forEach(work => {
+            const { coords } = App.workouts.find(
+                ({ id }) => id === work.dataset.id
+            );
+
+            console.log(coords);
+        });
     }
 
     _loadMap(...coords) {
