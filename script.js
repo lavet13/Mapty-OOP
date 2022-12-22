@@ -302,9 +302,9 @@ class App {
                 this._hideElement(containerWorkouts, sortBtn);
                 this._hideElement(containerWorkouts, selectSort);
 
-                this.renderWeather();
+                await this.renderWeather();
 
-                this.timeUpdate({
+                await this.timeUpdate({
                     time: this._timeForWeatherURL(latitude, longitude),
                     weather: this._weatherURL(latitude, longitude),
                 });
@@ -382,8 +382,7 @@ class App {
             setInterval(async () => {
                 try {
                     this.currentTime = await this.getTimeForWeather(time);
-                    await this.getWeather(weather);
-                    resolve();
+                    resolve(await this.getWeather(weather));
                 } catch (err) {
                     new ModalMessage(`${err.message}`, 10).openModal();
                 }
@@ -403,7 +402,7 @@ class App {
         }
     }
 
-    async getDataWeather(url) {
+    async getWeather(url) {
         try {
             const {
                 hourly_units: { temperature_2m: tempType },
@@ -414,50 +413,74 @@ class App {
                 },
             } = await this.getJSON(url, `Weather cannot be found!`);
 
-            this.timeMap = new Map();
+            const timeMap = new Map();
 
             timeArray.forEach((t, index) => {
-                this.timeMap.set(t, [
+                timeMap.set(t, [
                     temperatureArray[index],
                     weatherCodeArray[index],
                 ]);
             });
 
-            this.tempType = tempType;
+            console.log(timeMap);
 
-            console.log(this.timeMap);
+            const [temperature, weatherCode] = timeMap.get(this.currentTime);
+
+            return {
+                temperature,
+                tempType,
+                weatherState: this.#weatherInterpretation.get(weatherCode),
+                currentTime: this.currentTime,
+            };
         } catch (err) {
             throw err;
         }
     }
 
-    async getWeather(url) {
+    async renderWeather() {
         try {
-            if (!this.timeMap) await this.getDataWeather(url);
+            const workouts = Array.from(
+                containerWorkouts.querySelectorAll('.workout'),
+                async work => {
+                    const { coords } = App.workouts.find(
+                        ({ id }) => id === work.dataset.id
+                    );
 
-            const [temperature, weatherCode] = this.timeMap.get(
-                this.currentTime
+                    const [latitude, longitude] = coords;
+                    console.log(coords);
+
+                    const data = await this.getWeather(
+                        this._weatherURL(latitude, longitude)
+                    );
+
+                    return { ...data, work };
+                }
             );
 
-            // console.log(
-            //     temperature,
-            //     this.tempType,
-            //     this.#weatherInterpretation.get(weatherCode),
-            //     this.currentTime
-            // );
+            const resultPromiseAll = await Promise.all(workouts);
+
+            resultPromiseAll.forEach(
+                ({ temperature, tempType, weatherState, work }) => {
+                    work.insertAdjacentHTML(
+                        'beforeend',
+                        `
+                        <div class="workout__details">
+                            <span class="workout__icon">☁</span>
+                            <span class="workout__value">${weatherState}</span>
+                            <span class="workout__unit"></span>
+                        </div>
+                        <div class="workout__details">
+                            <span class="workout__icon">🌡️</span>
+                            <span class="workout__value">${temperature}</span>
+                            <span class="workout__unit">${tempType}</span>
+                        </div>
+                    `
+                    );
+                }
+            );
         } catch (err) {
             throw err;
         }
-    }
-
-    renderWeather() {
-        containerWorkouts.querySelectorAll('.workout').forEach(work => {
-            const { coords } = App.workouts.find(
-                ({ id }) => id === work.dataset.id
-            );
-
-            console.log(coords);
-        });
     }
 
     _loadMap(...coords) {
