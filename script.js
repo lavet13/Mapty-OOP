@@ -162,7 +162,7 @@ class Workout {
                 <span class="workout__value">${this.duration}</span>
                 <span class="workout__unit">min</span>
             </div>
-            <div class="workout__details">
+            <div class="workout__details workout__energy">
                 <span class="workout__icon">⚡️</span>
                 <span class="workout__value">${this._setProperty.call(
                     this.type,
@@ -264,12 +264,12 @@ class App {
         [71, '🌨️(slight)'],
         [73, '🌨️(moderate)'],
         [75, '🌨️(heavy)'],
-        [77, '❄'],
-        [80, '🚿🌨️(slight)'],
-        [81, '🚿🌨️(moderate)'],
-        [82, '🚿🌨️(violent)'],
-        [85, '･:*:｡･:*:･ﾟ(slight)'],
-        [86, '･:*:｡･:*:･ﾟ(heavy)'],
+        [77, '❄ grains'],
+        [80, '🚿🌧️(slight)'],
+        [81, '🚿🌧️(moderate)'],
+        [82, '🚿🌧️(violent)'],
+        [85, '🚿🌨️(slight)'],
+        [86, '🚿🌨️(heavy)'],
         [95, '⛈️(slight)'],
         [96, '⛈️(slight hail)'],
         [99, '⛈️(heavy hail)'],
@@ -447,7 +447,6 @@ class App {
                     );
 
                     const [latitude, longitude] = coords;
-                    console.log(coords);
 
                     const data = await this.getWeather(
                         this._weatherURL(latitude, longitude)
@@ -464,11 +463,12 @@ class App {
                     work.insertAdjacentHTML(
                         'beforeend',
                         `
-                        <div class="workout__details">
-                            <span class="workout__icon">${weatherState}</span>
-                            <span class="workout__value"></span>
+                        <div class="workout__details workout__weather">
+                            <span class="workout__icon">️</span>
+                            <span class="workout__value">${weatherState}</span>
+                            <span class="workout__unit"></span>
                         </div>
-                        <div class="workout__details">
+                        <div class="workout__details workout__weather">
                             <span class="workout__icon">🌡️</span>
                             <span class="workout__value">${temperature}</span>
                             <span class="workout__unit">${tempType}</span>
@@ -643,6 +643,12 @@ class App {
             id: workoutContainer.dataset.id,
         };
 
+        const weatherData = [...data.details]
+            .filter(el => el.matches('.workout__weather'))
+            .flatMap(el => [...el.children].map(el => el.textContent));
+
+        console.log(weatherData);
+
         const type = App.workouts.find(workout => workout.id === data.id).type;
 
         let string = `${data.description.outerHTML}<form class="form--edit">`;
@@ -667,7 +673,8 @@ class App {
         for (const [i, detail] of data.details.entries()) {
             const [icon, value, unit] = detail.children;
 
-            if (i === data.details.length - 2) continue;
+            if (detail.matches('.workout__weather')) continue;
+            if (detail.matches('.workout__energy')) continue;
 
             string += `<div class="workout__details workout__details--edit">
                 <span class="workout__icon workout__icon--edit">${
