@@ -244,6 +244,8 @@ class App {
     static #mapEvent;
     static #mapZoomLevel = 13;
 
+    weatherDataForm = new Map();
+
     #weatherInterpretation = new Map([
         [0, '️️☀️️'],
         [1, '️️☀️'],
@@ -295,7 +297,7 @@ class App {
                     this._timeForWeatherURL(latitude, longitude)
                 );
 
-                await this.getWeather(this._weatherURL(latitude, longitude));
+                // await this.getWeather(this._weatherURL(latitude, longitude)); // get your own weather conditions
 
                 this._getLocalStorage();
 
@@ -309,6 +311,7 @@ class App {
                     weather: this._weatherURL(latitude, longitude),
                 });
             } catch (err) {
+                console.log(err);
                 new ModalMessage(`${err.message}`, 10).openModal();
             }
         })();
@@ -381,12 +384,12 @@ class App {
         return new Promise(resolve => {
             setInterval(async () => {
                 try {
-                    this.currentTime = await this.getTimeForWeather(time);
-                    resolve(await this.getWeather(weather));
+                    await this.renderWeather();
+                    resolve();
                 } catch (err) {
                     new ModalMessage(`${err.message}`, 10).openModal();
                 }
-            }, 1000 * 60 * 2); // 2 min
+            }, 1000 * 60 * 5); // 2 min
         });
     }
 
@@ -422,9 +425,8 @@ class App {
                 ]);
             });
 
-            console.log(timeMap);
-
             const [temperature, weatherCode] = timeMap.get(this.currentTime);
+            console.log(temperature, weatherCode);
 
             return {
                 temperature,
@@ -457,6 +459,10 @@ class App {
             );
 
             const resultPromiseAll = await Promise.all(workouts);
+
+            containerWorkouts
+                .querySelectorAll('.workout__weather')
+                .forEach(workout => workout.remove());
 
             resultPromiseAll.forEach(
                 ({ temperature, tempType, weatherState, work }) => {
@@ -525,86 +531,94 @@ class App {
         inputElevation.closest('.form__row').classList.add('form__row--hidden');
     }
 
-    _newWorkout(e) {
-        e.preventDefault();
+    async _newWorkout(e) {
+        try {
+            e.preventDefault();
 
-        const allPositive = (...inputs) => inputs.every(input => +input > 0);
+            const allPositive = (...inputs) =>
+                inputs.every(input => +input > 0);
 
-        const isFilledInputs = (...inputs) =>
-            inputs.every(input => input !== '');
+            const isFilledInputs = (...inputs) =>
+                inputs.every(input => input !== '');
 
-        const validInputsNumbers = (...inputs) =>
-            inputs.every(input => Number.isFinite(+input));
+            const validInputsNumbers = (...inputs) =>
+                inputs.every(input => Number.isFinite(+input));
 
-        const { lat: latitude, lng: longitude } = App.getMapEvent().latlng;
-        const coords = [latitude, longitude];
-        const type = inputType.value,
-            distance = inputDistance.value,
-            duration = inputDuration.value;
+            const { lat: latitude, lng: longitude } = App.getMapEvent().latlng;
+            const coords = [latitude, longitude];
+            const type = inputType.value,
+                distance = inputDistance.value,
+                duration = inputDuration.value;
 
-        if (type === 'running') {
-            const cadence = inputCadence.value;
+            if (type === 'running') {
+                const cadence = inputCadence.value;
 
-            if (!isFilledInputs(distance, duration, cadence)) {
-                return new ModalMessage(
-                    'Inputs have to be filled!'
-                ).openModal();
+                if (!isFilledInputs(distance, duration, cadence)) {
+                    return new ModalMessage(
+                        'Inputs have to be filled!'
+                    ).openModal();
+                }
+
+                if (!validInputsNumbers(distance, duration, cadence)) {
+                    return new ModalMessage(
+                        'Inputs have to be THE numbers!'
+                    ).openModal();
+                }
+
+                if (!allPositive(distance, duration, cadence)) {
+                    return new ModalMessage(
+                        'Inputs have to be positive numbers!'
+                    ).openModal();
+                }
+
+                App.workouts.push(
+                    new Running(distance, duration, coords, cadence)
+                        .setId(App.#incrementId())
+                        .render()
+                        .addMarkToMap()
+                );
             }
 
-            if (!validInputsNumbers(distance, duration, cadence)) {
-                return new ModalMessage(
-                    'Inputs have to be THE numbers!'
-                ).openModal();
+            if (type === 'cycling') {
+                const elevationGain = inputElevation.value;
+
+                if (!isFilledInputs(distance, duration, elevationGain)) {
+                    return new ModalMessage(
+                        'Inputs have to be filled!'
+                    ).openModal();
+                }
+
+                if (!validInputsNumbers(distance, duration, elevationGain)) {
+                    return new ModalMessage(
+                        'Inputs have to be THE numbers!'
+                    ).openModal();
+                }
+
+                if (!allPositive(distance, duration)) {
+                    return new ModalMessage(
+                        'Inputs have to be positive numbers!'
+                    ).openModal();
+                }
+
+                App.workouts.push(
+                    new Cycling(distance, duration, coords, elevationGain)
+                        .setId(App.#incrementId())
+                        .render()
+                        .addMarkToMap()
+                );
             }
 
-            if (!allPositive(distance, duration, cadence)) {
-                return new ModalMessage(
-                    'Inputs have to be positive numbers!'
-                ).openModal();
-            }
+            // weather implementation
+            await this.renderWeather();
 
-            App.workouts.push(
-                new Running(distance, duration, coords, cadence)
-                    .setId(App.#incrementId())
-                    .render()
-                    .addMarkToMap()
-            );
+            new ModalMessage('New workout created! 😌').openModal();
+            this._setLocalStorage();
+            this._hideForm();
+            this._hideElement(containerWorkouts, sortBtn);
+            this._hideElement(containerWorkouts, selectSort);
+        } catch (err) {
+            throw err;
         }
-
-        if (type === 'cycling') {
-            const elevationGain = inputElevation.value;
-
-            if (!isFilledInputs(distance, duration, elevationGain)) {
-                return new ModalMessage(
-                    'Inputs have to be filled!'
-                ).openModal();
-            }
-
-            if (!validInputsNumbers(distance, duration, elevationGain)) {
-                return new ModalMessage(
-                    'Inputs have to be THE numbers!'
-                ).openModal();
-            }
-
-            if (!allPositive(distance, duration)) {
-                return new ModalMessage(
-                    'Inputs have to be positive numbers!'
-                ).openModal();
-            }
-
-            App.workouts.push(
-                new Cycling(distance, duration, coords, elevationGain)
-                    .setId(App.#incrementId())
-                    .render()
-                    .addMarkToMap()
-            );
-        }
-
-        new ModalMessage('New workout created! 😌').openModal();
-        this._setLocalStorage();
-        this._hideForm();
-        this._hideElement(containerWorkouts, sortBtn);
-        this._hideElement(containerWorkouts, selectSort);
     }
 
     _moveToPopup(e) {
@@ -645,9 +659,10 @@ class App {
 
         const weatherData = [...data.details]
             .filter(el => el.matches('.workout__weather'))
-            .flatMap(el => [...el.children].map(el => el.textContent));
+            .map(el => [...el.children].map(el => el.textContent));
 
-        console.log(weatherData);
+        this.weatherDataForm.set(data.id, weatherData);
+        console.log(this.weatherDataForm);
 
         const type = App.workouts.find(workout => workout.id === data.id).type;
 
@@ -787,6 +802,27 @@ class App {
                     .render()
             );
         }
+
+        const [[, weatherState], [temperatureIcon, temperature, tempType]] =
+            this.weatherDataForm.get(data.id);
+
+        console.log(e.target.parentElement.parentElement.parentElement);
+
+        e.target.parentElement.parentElement.parentElement.insertAdjacentHTML(
+            'beforeend',
+            `
+            <div class="workout__details workout__weather">
+                <span class="workout__icon">️</span>
+                <span class="workout__value">${weatherState}</span>
+                <span class="workout__unit"></span>
+            </div>
+            <div class="workout__details workout__weather">
+                <span class="workout__icon">${temperatureIcon}</span>
+                <span class="workout__value">${temperature}</span>
+                <span class="workout__unit">${tempType}</span>
+            </div>
+        `
+        );
 
         new ModalMessage('Workout submitted! 😳').openModal();
         this._setLocalStorage();
