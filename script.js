@@ -505,6 +505,7 @@ class App {
         form.classList.remove('hidden');
         inputDistance.focus();
         App.setMapEvent(mapE);
+        console.log(mapE);
     }
 
     _toggleElevationField(e) {
@@ -720,7 +721,7 @@ class App {
 
         if (!e.target.matches('.btn--submit')) return false;
 
-        const workoutContainer = e.target.closest('.workout');
+        let workoutContainer = e.target.closest('.workout');
 
         const data = {
             id: workoutContainer.dataset.id,
@@ -806,9 +807,9 @@ class App {
         const [[, weatherState], [temperatureIcon, temperature, tempType]] =
             this.weatherDataForm.get(data.id);
 
-        console.log(e.target.parentElement.parentElement.parentElement);
+        workoutContainer = document.querySelector(`[data-id="${data.id}"]`);
 
-        e.target.parentElement.parentElement.parentElement.insertAdjacentHTML(
+        workoutContainer.insertAdjacentHTML(
             'beforeend',
             `
             <div class="workout__details workout__weather">
@@ -832,7 +833,7 @@ class App {
     _cancelWorkout(e) {
         if (!e.target.matches('.btn--cancel')) return false;
 
-        const workoutContainer = e.target.closest('.workout');
+        let workoutContainer = e.target.closest('.workout');
 
         const data = {
             id: workoutContainer.dataset.id,
@@ -872,6 +873,27 @@ class App {
                     .render()
             );
         }
+
+        workoutContainer = document.querySelector(`[data-id="${data.id}"]`);
+
+        const [[, weatherState], [temperatureIcon, temperature, tempType]] =
+            this.weatherDataForm.get(data.id);
+
+        workoutContainer.insertAdjacentHTML(
+            'beforeend',
+            `
+            <div class="workout__details workout__weather">
+                <span class="workout__icon">️</span>
+                <span class="workout__value">${weatherState}</span>
+                <span class="workout__unit"></span>
+            </div>
+            <div class="workout__details workout__weather">
+                <span class="workout__icon">${temperatureIcon}</span>
+                <span class="workout__value">${temperature}</span>
+                <span class="workout__unit">${tempType}</span>
+            </div>
+        `
+        );
 
         new ModalMessage('Canceled! HAha 🤔').openModal();
         this._setLocalStorage();
