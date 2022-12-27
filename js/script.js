@@ -1,5 +1,9 @@
 'use strict';
 
+import ModalMessage from './modules/modalMessage.js';
+import Running from './modules/running.js';
+import Cycling from './modules/cycling.js';
+
 const form = document.querySelector('.form');
 const containerWorkouts = document.querySelector('.workouts');
 const inputType = document.querySelector('.form__input--type');
@@ -16,228 +20,11 @@ let sortType = 'distance';
 const sortBtn = document.querySelector('.btn--sort');
 const selectSort = document.querySelector('.sort-selector');
 
-class ModalMessage {
-    static messages = [];
-    static #modalContainer = document.querySelector('.modal');
-    static #modalCloseBtn =
-        ModalMessage.#modalContainer.querySelector('.modal__btn-close');
-    #timeout;
-
-    constructor(msg, seconds = 2) {
-        this._msg = msg;
-        this._seconds = seconds;
-
-        this._insertMessage();
-        ModalMessage.#modalCloseBtn.addEventListener(
-            'click',
-            this._closeModal.bind(this)
-        );
-
-        ModalMessage.messages.at(-1)?.cancelTimeout();
-        ModalMessage.messages.push(this);
-        if (ModalMessage.messages.length === 2)
-            ModalMessage.messages.splice(0, 1);
-    }
-
-    _insertMessage() {
-        ModalMessage.#modalContainer.querySelector('.modal__content') &&
-            ModalMessage.#modalContainer.removeChild(
-                ModalMessage.#modalContainer.querySelector('.modal__content')
-            );
-
-        ModalMessage.#modalContainer.insertAdjacentHTML(
-            'beforeend',
-            `<div class="modal__content">${this._msg}</div>`
-        );
-    }
-
-    cancelTimeout() {
-        clearTimeout(this.#timeout);
-    }
-
-    openModal() {
-        if (ModalMessage.#modalContainer.matches('.hidden')) {
-            ModalMessage.#modalContainer.classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
-        }
-
-        this.#timeout = setTimeout(
-            this._closeModal.bind(this),
-            this._seconds * 1000
-        );
-    }
-
-    _closeModal(e) {
-        e?.preventDefault();
-
-        if (!ModalMessage.#modalContainer.matches('.hidden')) {
-            ModalMessage.#modalContainer.classList.add('hidden');
-            document.body.style.overflow = '';
-        }
-    }
-}
-
-class Workout {
-    date = new Date().toISOString();
-
-    constructor(distance, duration, coords) {
-        this.distance = distance; // in km
-        this.duration = duration; // in min
-        this.coords = coords; // [lat, lng]
-    }
-
-    setId(id) {
-        this.id = id;
-        return this;
-    }
-
-    _setProperty(firstVal, secondVal) {
-        let value;
-
-        this === 'running' && (value = firstVal);
-        this === 'cycling' && (value = secondVal);
-
-        return value ?? 'no-value';
-    }
-
-    _setDescription(isoString) {
-        // prettier-ignore
-        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-        const date = new Date(isoString);
-        const getMonth = date => months[date.getMonth()];
-        const getDate = date => String(date.getDate()).padStart(2, 0);
-
-        this.description = `${this._setProperty.call(
-            this.type,
-            '🏃‍♂️ Running',
-            '🚴‍♀️Cycling'
-        )} on ${getMonth(date)} ${getDate(date)}`;
-    }
-
-    addMarkToMap() {
-        // console.log(App.getMap()); // it will be undefined as we trying to get map
-        // that isn't created yet(first glimpse of asynchronous JavaScript),
-        // so it's not created right at the beginning when the application is first loaded.
-        // so it takes some time.
-
-        L.marker(this.coords)
-            .addTo(App.getMap())
-            .bindPopup(
-                L.popup({
-                    maxWidth: 250,
-                    minWidth: 100,
-                    autoClose: false, // prevent the default behavior of the popup closing when another popup is opened
-                    closeOnClick: false, // prevent whenever user clicks on the map
-                    className: `${this._setProperty.call(
-                        this.type,
-                        'running-popup',
-                        'cycling-popup'
-                    )}`,
-                })
-            )
-            .setPopupContent(this.description)
-            .openPopup();
-        return this;
-    }
-
-    render() {
-        const html = `
-        <li class="workout workout--${this._setProperty.call(
-            this.type,
-            'running',
-            'cycling'
-        )}" data-id="${this.id}">
-            <h2 class="workout__title">${this.description}</h2>
-            <div class="workout__details">
-                <span class="workout__icon">${this._setProperty.call(
-                    this.type,
-                    '🏃‍♂️',
-                    '🚴‍♀️'
-                )}</span>
-                <span class="workout__value">${this.distance}</span>
-                <span class="workout__unit">km</span>
-            </div>
-            <div class="workout__details">
-                <span class="workout__icon">⏱</span>
-                <span class="workout__value">${this.duration}</span>
-                <span class="workout__unit">min</span>
-            </div>
-            <div class="workout__details workout__energy">
-                <span class="workout__icon">⚡️</span>
-                <span class="workout__value">${this._setProperty.call(
-                    this.type,
-                    this.pace,
-                    this.speed
-                )}</span>
-                <span class="workout__unit">${this._setProperty.call(
-                    this.type,
-                    'min/km',
-                    'km/h'
-                )}</span>
-            </div>
-            <div class="workout__details">
-                <span class="workout__icon">${this._setProperty.call(
-                    this.type,
-                    '🦶🏼',
-                    '⛰'
-                )}</span>
-                <span class="workout__value">${this._setProperty.call(
-                    this.type,
-                    this.cadence,
-                    this.elevationGain
-                )}</span>
-                <span class="workout__unit">${this._setProperty.call(
-                    this.type,
-                    'spm',
-                    'm'
-                )}</span>
-            </div>
-            <button class="btn btn--edit"><span>📝</span>Edit</button>
-            <button class="btn btn--del"><span>❌</span>Delete</button>
-        </li>`;
-
-        form.insertAdjacentHTML('afterend', html);
-        return this;
-    }
-}
-
-class Running extends Workout {
-    type = 'running';
-
-    constructor(distance, duration, coords, cadence) {
-        super(+distance, +duration, coords);
-        this.cadence = +cadence;
-        this._calcPace();
-        this._setDescription(this.date);
-    }
-
-    _calcPace() {
-        // min/km
-        this.pace = (this.duration / this.distance).toFixed(1);
-        return this.pace;
-    }
-}
-
-class Cycling extends Workout {
-    type = 'cycling';
-
-    constructor(distance, duration, coords, elevationGain) {
-        super(+distance, +duration, coords);
-        this.elevationGain = +elevationGain;
-        this._calcSpeed();
-        this._setDescription(this.date);
-    }
-
-    _calcSpeed() {
-        // km/h
-        this.speed = (this.distance / (this.duration / 60)).toFixed(1);
-        return this.speed;
-    }
-}
+export { form };
 
 ////////////////////////////////////////////////////
 // APPLICATION ARCHITECTURE
-class App {
+export default class App {
     static workouts = [];
     static #id = 0n;
     static #map;
@@ -462,7 +249,7 @@ class App {
 
             containerWorkouts
                 .querySelectorAll('.workout__weather')
-                .forEach(workout => workout.remove());
+                ?.forEach(workout => workout.remove());
 
             resultPromiseAll.forEach(
                 ({ temperature, tempType, weatherState, work }) => {
@@ -825,6 +612,8 @@ class App {
         `
         );
 
+        this.weatherDataForm.delete(data.id);
+
         new ModalMessage('Workout submitted! 😳').openModal();
         this._setLocalStorage();
         return true;
@@ -894,6 +683,8 @@ class App {
             </div>
         `
         );
+
+        this.weatherDataForm.delete(data.id);
 
         new ModalMessage('Canceled! HAha 🤔').openModal();
         this._setLocalStorage();
