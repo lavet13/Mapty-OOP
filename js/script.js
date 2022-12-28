@@ -3,6 +3,8 @@
 import ModalMessage from './modules/modalMessage.js';
 import Running from './modules/running.js';
 import Cycling from './modules/cycling.js';
+import { timeForWeatherURL, weatherURL } from './modules/weather.js';
+import { getJSON } from './services/fetch.js';
 
 const form = document.querySelector('.form');
 const containerWorkouts = document.querySelector('.workouts');
@@ -64,14 +66,6 @@ export default class App {
         [99, '⛈️(heavy hail)'],
     ]);
 
-    _timeForWeatherURL = function (latitude, longitude) {
-        return `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&timezone=Europe%2FMoscow`;
-    };
-
-    _weatherURL = function (latitude, longitude) {
-        return `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m&hourly=weathercode&timezone=Europe%2FMoscow`;
-    };
-
     constructor() {
         (async () => {
             try {
@@ -81,7 +75,7 @@ export default class App {
                 this._loadMap(latitude, longitude);
 
                 this.currentTime = await this.getTimeForWeather(
-                    this._timeForWeatherURL(latitude, longitude)
+                    timeForWeatherURL(latitude, longitude)
                 );
 
                 // await this.getWeather(this._weatherURL(latitude, longitude)); // get your own weather conditions
@@ -94,8 +88,8 @@ export default class App {
                 await this.renderWeather();
 
                 await this.timeUpdate({
-                    time: this._timeForWeatherURL(latitude, longitude),
-                    weather: this._weatherURL(latitude, longitude),
+                    time: timeForWeatherURL(latitude, longitude),
+                    weather: weatherURL(latitude, longitude),
                 });
             } catch (err) {
                 console.log(err);
@@ -155,18 +149,6 @@ export default class App {
         });
     }
 
-    async getJSON(url, msg = `Something went wrong`) {
-        try {
-            const res = await fetch(url);
-
-            if (!res.ok) throw new Error(`${msg} status code: ${res.status}`);
-
-            return await res.json();
-        } catch (err) {
-            throw err;
-        }
-    }
-
     timeUpdate({ time, weather }) {
         return new Promise(resolve => {
             setInterval(async () => {
@@ -184,7 +166,7 @@ export default class App {
         try {
             const {
                 current_weather: { time: currentTime },
-            } = await this.getJSON(url, `Cannot get the time 😀`);
+            } = await getJSON(url, `Cannot get the time 😀`);
 
             return currentTime;
         } catch (err) {
@@ -201,7 +183,7 @@ export default class App {
                     temperature_2m: temperatureArray,
                     weathercode: weatherCodeArray,
                 },
-            } = await this.getJSON(url, `Weather cannot be found!`);
+            } = await getJSON(url, `Weather cannot be found!`);
 
             const timeMap = new Map();
 
@@ -238,7 +220,7 @@ export default class App {
                     const [latitude, longitude] = coords;
 
                     const data = await this.getWeather(
-                        this._weatherURL(latitude, longitude)
+                        weatherURL(latitude, longitude)
                     );
 
                     return { ...data, work };
