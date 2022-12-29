@@ -3,7 +3,14 @@
 import ModalMessage from './modules/modalMessage.js';
 import Running from './modules/running.js';
 import Cycling from './modules/cycling.js';
-import { timeForWeatherURL, weatherURL } from './modules/weather.js';
+import {
+    timeForWeatherURL,
+    weatherURL,
+    weatherInterpretation,
+    weatherDataForm,
+    reRenderWeather,
+    getTimeForWeather,
+} from './modules/weather.js';
 import { getJSON } from './services/fetch.js';
 
 const form = document.querySelector('.form');
@@ -33,39 +40,6 @@ export default class App {
     static #mapEvent;
     static #mapZoomLevel = 13;
 
-    weatherDataForm = new Map();
-
-    #weatherInterpretation = new Map([
-        [0, '️️☀️️'],
-        [1, '️️☀️'],
-        [2, '🌤️'],
-        [3, '⛅'],
-        [45, '🌫️'],
-        [48, '🌫️'],
-        [51, '☔(light)'],
-        [53, '☔(moderate)'],
-        [55, '☔(dense)'],
-        [56, '☔🥶(light)'],
-        [57, '☔🥶(dense)'],
-        [61, '🌧️(slight)'],
-        [63, '🌧️(moderate)'],
-        [65, '🌧️(heavy)'],
-        [66, '🧊🌧️(light)'],
-        [67, '🧊🌧️(heavy)'],
-        [71, '🌨️(slight)'],
-        [73, '🌨️(moderate)'],
-        [75, '🌨️(heavy)'],
-        [77, '❄ grains'],
-        [80, '🚿🌧️(slight)'],
-        [81, '🚿🌧️(moderate)'],
-        [82, '🚿🌧️(violent)'],
-        [85, '🚿🌨️(slight)'],
-        [86, '🚿🌨️(heavy)'],
-        [95, '⛈️(slight)'],
-        [96, '⛈️(slight hail)'],
-        [99, '⛈️(heavy hail)'],
-    ]);
-
     constructor() {
         (async () => {
             try {
@@ -74,7 +48,7 @@ export default class App {
 
                 this._loadMap(latitude, longitude);
 
-                this.currentTime = await this.getTimeForWeather(
+                this.currentTime = await getTimeForWeather(
                     timeForWeatherURL(latitude, longitude)
                 );
 
@@ -162,18 +136,6 @@ export default class App {
         });
     }
 
-    async getTimeForWeather(url) {
-        try {
-            const {
-                current_weather: { time: currentTime },
-            } = await getJSON(url, `Cannot get the time 😀`);
-
-            return currentTime;
-        } catch (err) {
-            throw err;
-        }
-    }
-
     async getWeather(url) {
         try {
             const {
@@ -200,7 +162,7 @@ export default class App {
             return {
                 temperature,
                 tempType,
-                weatherState: this.#weatherInterpretation.get(weatherCode),
+                weatherState: weatherInterpretation.get(weatherCode),
                 currentTime: this.currentTime,
             };
         } catch (err) {
@@ -431,8 +393,8 @@ export default class App {
             .filter(el => el.matches('.workout__weather'))
             .map(el => [...el.children].map(el => el.textContent));
 
-        this.weatherDataForm.set(data.id, weatherData);
-        console.log(this.weatherDataForm);
+        weatherDataForm.set(data.id, weatherData);
+        console.log(weatherDataForm);
 
         const type = App.workouts.find(workout => workout.id === data.id).type;
 
@@ -573,28 +535,7 @@ export default class App {
             );
         }
 
-        const [[, weatherState], [temperatureIcon, temperature, tempType]] =
-            this.weatherDataForm.get(data.id);
-
-        workoutContainer = document.querySelector(`[data-id="${data.id}"]`);
-
-        workoutContainer.insertAdjacentHTML(
-            'beforeend',
-            `
-            <div class="workout__details workout__weather">
-                <span class="workout__icon">️</span>
-                <span class="workout__value">${weatherState}</span>
-                <span class="workout__unit"></span>
-            </div>
-            <div class="workout__details workout__weather">
-                <span class="workout__icon">${temperatureIcon}</span>
-                <span class="workout__value">${temperature}</span>
-                <span class="workout__unit">${tempType}</span>
-            </div>
-        `
-        );
-
-        this.weatherDataForm.delete(data.id);
+        reRenderWeather();
 
         new ModalMessage('Workout submitted! 😳').openModal();
         this._setLocalStorage();
@@ -647,26 +588,7 @@ export default class App {
 
         workoutContainer = document.querySelector(`[data-id="${data.id}"]`);
 
-        const [[, weatherState], [temperatureIcon, temperature, tempType]] =
-            this.weatherDataForm.get(data.id);
-
-        workoutContainer.insertAdjacentHTML(
-            'beforeend',
-            `
-            <div class="workout__details workout__weather">
-                <span class="workout__icon">️</span>
-                <span class="workout__value">${weatherState}</span>
-                <span class="workout__unit"></span>
-            </div>
-            <div class="workout__details workout__weather">
-                <span class="workout__icon">${temperatureIcon}</span>
-                <span class="workout__value">${temperature}</span>
-                <span class="workout__unit">${tempType}</span>
-            </div>
-        `
-        );
-
-        this.weatherDataForm.delete(data.id);
+        reRenderWeather();
 
         new ModalMessage('Canceled! HAha 🤔').openModal();
         this._setLocalStorage();
