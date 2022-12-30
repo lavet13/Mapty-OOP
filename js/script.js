@@ -3,14 +3,7 @@
 import ModalMessage from './modules/modalMessage.js';
 import Running from './modules/running.js';
 import Cycling from './modules/cycling.js';
-import {
-    timeForWeatherURL,
-    weatherURL,
-    weatherInterpretation,
-    weatherDataForm,
-    reRenderWeather,
-    getTimeForWeather,
-} from './modules/weather.js';
+import WeatherAPI from './modules/weather.js';
 import { getJSON } from './services/fetch.js';
 
 const form = document.querySelector('.form');
@@ -48,8 +41,8 @@ export default class App {
 
                 this._loadMap(latitude, longitude);
 
-                this.currentTime = await getTimeForWeather(
-                    timeForWeatherURL(latitude, longitude)
+                WeatherAPI.currentTime = await WeatherAPI.getTimeForWeather(
+                    WeatherAPI.timeForWeatherURL(latitude, longitude)
                 );
 
                 // await this.getWeather(this._weatherURL(latitude, longitude)); // get your own weather conditions
@@ -62,8 +55,8 @@ export default class App {
                 await this.renderWeather();
 
                 await this.timeUpdate({
-                    time: timeForWeatherURL(latitude, longitude),
-                    weather: weatherURL(latitude, longitude),
+                    time: WeatherAPI.timeForWeatherURL(latitude, longitude),
+                    weather: WeatherAPI.weatherURL(latitude, longitude),
                 });
             } catch (err) {
                 console.log(err);
@@ -156,14 +149,16 @@ export default class App {
                 ]);
             });
 
-            const [temperature, weatherCode] = timeMap.get(this.currentTime);
+            const [temperature, weatherCode] = timeMap.get(
+                WeatherAPI.currentTime
+            );
             console.log(temperature, weatherCode);
 
             return {
                 temperature,
                 tempType,
-                weatherState: weatherInterpretation.get(weatherCode),
-                currentTime: this.currentTime,
+                weatherState: WeatherAPI.weatherInterpretation.get(weatherCode),
+                currentTime: WeatherAPI.currentTime,
             };
         } catch (err) {
             throw err;
@@ -182,7 +177,7 @@ export default class App {
                     const [latitude, longitude] = coords;
 
                     const data = await this.getWeather(
-                        weatherURL(latitude, longitude)
+                        WeatherAPI.weatherURL(latitude, longitude)
                     );
 
                     return { ...data, work };
@@ -393,8 +388,8 @@ export default class App {
             .filter(el => el.matches('.workout__weather'))
             .map(el => [...el.children].map(el => el.textContent));
 
-        weatherDataForm.set(data.id, weatherData);
-        console.log(weatherDataForm);
+        WeatherAPI.weatherDataForm.set(data.id, weatherData);
+        console.log(WeatherAPI.weatherDataForm);
 
         const type = App.workouts.find(workout => workout.id === data.id).type;
 
@@ -535,7 +530,7 @@ export default class App {
             );
         }
 
-        reRenderWeather();
+        WeatherAPI.reRenderWeather({ workoutContainer, id: data.id });
 
         new ModalMessage('Workout submitted! 😳').openModal();
         this._setLocalStorage();
@@ -588,7 +583,7 @@ export default class App {
 
         workoutContainer = document.querySelector(`[data-id="${data.id}"]`);
 
-        reRenderWeather();
+        WeatherAPI.reRenderWeather({ workoutContainer, id: data.id });
 
         new ModalMessage('Canceled! HAha 🤔').openModal();
         this._setLocalStorage();
