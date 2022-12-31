@@ -1,7 +1,9 @@
 import { getJSON } from '../services/fetch.js';
+import App from '../script.js';
 
 export default class WeatherAPI {
     static weatherDataForm = new Map();
+    static weatherData = new Map(); // overall data about the weather of each workout
 
     static currentTime;
 
@@ -44,8 +46,6 @@ export default class WeatherAPI {
         [99, '⛈️(heavy hail)'],
     ]);
 
-    constructor() {}
-
     static async getTimeForWeather(url) {
         try {
             const {
@@ -58,13 +58,166 @@ export default class WeatherAPI {
         }
     }
 
+    static async getWeather(url) {
+        try {
+            const {
+                hourly_units: { temperature_2m: tempType },
+                hourly: {
+                    time: timeArray,
+                    temperature_2m: temperatureArray,
+                    weathercode: weatherCodeArray,
+                },
+            } = await getJSON(url, `Weather cannot be found!`);
+
+            const timeMap = new Map();
+
+            timeArray.forEach((t, index) => {
+                timeMap.set(t, [
+                    temperatureArray[index],
+                    weatherCodeArray[index],
+                ]);
+            });
+
+            const [temperature, weatherCode] = timeMap.get(
+                WeatherAPI.currentTime
+            );
+            console.log(temperature, weatherCode);
+
+            return {
+                temperature,
+                tempType,
+                weatherState: WeatherAPI.weatherInterpretation.get(weatherCode),
+                currentTime: WeatherAPI.currentTime,
+            };
+        } catch (err) {
+            throw err;
+        }
+    }
+
+    static async addNextWeatherData({ containerWorkouts, newId }) {
+        try {
+            containerWorkouts
+                .querySelectorAll('.workout__weather')
+                ?.forEach(weather => weather.remove());
+
+            WeatherAPI.weatherData.forEach(
+                ({ temperature, tempType, weatherState }, id) => {
+                    containerWorkouts
+                        .querySelector(`[data-id="${id}"]`)
+                        ?.insertAdjacentHTML(
+                            'beforeend',
+                            `
+                            <div class="workout__details workout__weather">
+                                <span class="workout__icon">️</span>
+                                <span class="workout__value">${weatherState}</span>
+                                <span class="workout__unit"></span>
+                            </div>
+                            <div class="workout__details workout__weather">
+                                <span class="workout__icon">🌡️</span>
+                                <span class="workout__value">${temperature}</span>
+                                <span class="workout__unit">${tempType}</span>
+                            </div>   
+                        `
+                        );
+                }
+            );
+
+            const { coords } = App.workouts.find(({ id }) => id === newId);
+
+            const { temperature, tempType, weatherState } =
+                await WeatherAPI.getWeather(WeatherAPI.weatherURL(...coords));
+
+            WeatherAPI.weatherData.set(newId, {
+                temperature,
+                tempType,
+                weatherState,
+            });
+
+            containerWorkouts
+                .querySelector(`[data-id="${newId}"]`)
+                ?.insertAdjacentHTML(
+                    'beforeend',
+                    `
+                    <div class="workout__details workout__weather">
+                        <span class="workout__icon">️</span>
+                        <span class="workout__value">${weatherState}</span>
+                        <span class="workout__unit"></span>
+                    </div>
+                    <div class="workout__details workout__weather">
+                        <span class="workout__icon">🌡️</span>
+                        <span class="workout__value">${temperature}</span>
+                        <span class="workout__unit">${tempType}</span>
+                    </div>   
+                    `
+                );
+
+            console.log(WeatherAPI.weatherData);
+        } catch (err) {
+            throw err;
+        }
+    }
+
+    static async renderWeather({ containerWorkouts }) {
+        try {
+            const workouts = Array.from(
+                containerWorkouts.querySelectorAll('.workout'),
+                async work => {
+                    const { coords } = App.workouts.find(
+                        ({ id }) => id === work.dataset.id
+                    );
+
+                    const { temperature, tempType, weatherState } =
+                        await WeatherAPI.getWeather(
+                            WeatherAPI.weatherURL(...coords)
+                        );
+
+                    WeatherAPI.weatherData.set(work.dataset.id, {
+                        temperature,
+                        tempType,
+                        weatherState,
+                    });
+
+                    return { temperature, tempType, weatherState, work };
+                }
+            );
+
+            const resultPromiseAll = await Promise.all(workouts);
+
+            containerWorkouts
+                .querySelectorAll('.workout__weather')
+                ?.forEach(weather => weather.remove());
+
+            resultPromiseAll.forEach(
+                ({ temperature, tempType, weatherState, work }) => {
+                    work.insertAdjacentHTML(
+                        'beforeend',
+                        `
+                        <div class="workout__details workout__weather">
+                            <span class="workout__icon">️</span>
+                            <span class="workout__value">${weatherState}</span>
+                            <span class="workout__unit"></span>
+                        </div>
+                        <div class="workout__details workout__weather">
+                            <span class="workout__icon">🌡️</span>
+                            <span class="workout__value">${temperature}</span>
+                            <span class="workout__unit">${tempType}</span>
+                        </div>
+                    `
+                    );
+                }
+            );
+        } catch (err) {
+            throw err;
+        }
+    }
+
     static reRenderWeather({ workoutContainer, id }) {
         const [[, weatherState], [temperatureIcon, temperature, tempType]] =
             WeatherAPI.weatherDataForm.get(id);
 
         workoutContainer = document.querySelector(`[data-id="${id}"]`);
 
-        workoutContainer.insertAdjacentHTML(
+        workoutContainer?.insertAdjacentHTML(
             'beforeend',
             `
             <div class="workout__details workout__weather">

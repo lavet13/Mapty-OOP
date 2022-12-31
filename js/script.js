@@ -45,14 +45,14 @@ export default class App {
                     WeatherAPI.timeForWeatherURL(latitude, longitude)
                 );
 
-                // await this.getWeather(this._weatherURL(latitude, longitude)); // get your own weather conditions
+                // await WeatherAPI.getWeather(this._weatherURL(latitude, longitude)); // get your own weather conditions
 
                 this._getLocalStorage();
 
                 this._hideElement(containerWorkouts, sortBtn);
                 this._hideElement(containerWorkouts, selectSort);
 
-                await this.renderWeather();
+                await WeatherAPI.renderWeather({ containerWorkouts });
 
                 await this.timeUpdate({
                     time: WeatherAPI.timeForWeatherURL(latitude, longitude),
@@ -120,98 +120,13 @@ export default class App {
         return new Promise(resolve => {
             setInterval(async () => {
                 try {
-                    await this.renderWeather();
+                    await WeatherAPI.renderWeather({ containerWorkouts });
                     resolve();
                 } catch (err) {
                     new ModalMessage(`${err.message}`, 10).openModal();
                 }
             }, 1000 * 60 * 5); // 2 min
         });
-    }
-
-    async getWeather(url) {
-        try {
-            const {
-                hourly_units: { temperature_2m: tempType },
-                hourly: {
-                    time: timeArray,
-                    temperature_2m: temperatureArray,
-                    weathercode: weatherCodeArray,
-                },
-            } = await getJSON(url, `Weather cannot be found!`);
-
-            const timeMap = new Map();
-
-            timeArray.forEach((t, index) => {
-                timeMap.set(t, [
-                    temperatureArray[index],
-                    weatherCodeArray[index],
-                ]);
-            });
-
-            const [temperature, weatherCode] = timeMap.get(
-                WeatherAPI.currentTime
-            );
-            console.log(temperature, weatherCode);
-
-            return {
-                temperature,
-                tempType,
-                weatherState: WeatherAPI.weatherInterpretation.get(weatherCode),
-                currentTime: WeatherAPI.currentTime,
-            };
-        } catch (err) {
-            throw err;
-        }
-    }
-
-    async renderWeather() {
-        try {
-            const workouts = Array.from(
-                containerWorkouts.querySelectorAll('.workout'),
-                async work => {
-                    const { coords } = App.workouts.find(
-                        ({ id }) => id === work.dataset.id
-                    );
-
-                    const [latitude, longitude] = coords;
-
-                    const data = await this.getWeather(
-                        WeatherAPI.weatherURL(latitude, longitude)
-                    );
-
-                    return { ...data, work };
-                }
-            );
-
-            const resultPromiseAll = await Promise.all(workouts);
-
-            containerWorkouts
-                .querySelectorAll('.workout__weather')
-                ?.forEach(workout => workout.remove());
-
-            resultPromiseAll.forEach(
-                ({ temperature, tempType, weatherState, work }) => {
-                    work.insertAdjacentHTML(
-                        'beforeend',
-                        `
-                        <div class="workout__details workout__weather">
-                            <span class="workout__icon">️</span>
-                            <span class="workout__value">${weatherState}</span>
-                            <span class="workout__unit"></span>
-                        </div>
-                        <div class="workout__details workout__weather">
-                            <span class="workout__icon">🌡️</span>
-                            <span class="workout__value">${temperature}</span>
-                            <span class="workout__unit">${tempType}</span>
-                        </div>
-                    `
-                    );
-                }
-            );
-        } catch (err) {
-            throw err;
-        }
     }
 
     _loadMap(...coords) {
@@ -277,6 +192,8 @@ export default class App {
                 distance = inputDistance.value,
                 duration = inputDuration.value;
 
+            const newId = App.#incrementId();
+
             if (type === 'running') {
                 const cadence = inputCadence.value;
 
@@ -300,7 +217,7 @@ export default class App {
 
                 App.workouts.push(
                     new Running(distance, duration, coords, cadence)
-                        .setId(App.#incrementId())
+                        .setId(newId)
                         .render()
                         .addMarkToMap()
                 );
@@ -329,14 +246,16 @@ export default class App {
 
                 App.workouts.push(
                     new Cycling(distance, duration, coords, elevationGain)
-                        .setId(App.#incrementId())
+                        .setId(newId)
                         .render()
                         .addMarkToMap()
                 );
             }
 
-            // weather implementation
-            await this.renderWeather();
+            await WeatherAPI.addNextWeatherData({
+                containerWorkouts,
+                newId,
+            });
 
             new ModalMessage('New workout created! 😌').openModal();
             this._setLocalStorage();
@@ -344,6 +263,7 @@ export default class App {
             this._hideElement(containerWorkouts, sortBtn);
             this._hideElement(containerWorkouts, selectSort);
         } catch (err) {
+            console.error(err);
             throw err;
         }
     }
@@ -628,6 +548,8 @@ export default class App {
                     break;
             }
         }
+
+        WeatherAPI.weatherData.delete(id);
 
         new ModalMessage('Workout deleted! 😚').openModal();
         this._hideElement(containerWorkouts, sortBtn);
