@@ -1,11 +1,19 @@
 {
     "name": "mapty",
     "version": "1.0.0",
-    "main": "script.js",
+    "source": "./index.html",
+    "browserslist": "> 0.5%, last 2 versions, not dead",
     "scripts": {
-        "start": "live-server"
+        "start": "parcel",
+        "build": "parcel build"
     },
     "author": "",
     "license": "ISC",
-    "description": ""
+    "description": "",
+    "devDependencies": {
+        "parcel": "^2.8.2"
+    },
+    "dependencies": {
+        "leaflet": "^1.9.3"
+    }
 }

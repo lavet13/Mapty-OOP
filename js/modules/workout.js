@@ -1,4 +1,5 @@
 import { form } from '../script.js';
+import { marker, popup } from 'leaflet';
 import App from '../script.js';
 
 export default class Workout {
@@ -44,10 +45,10 @@ export default class Workout {
         // so it's not created right at the beginning when the application is first loaded.
         // so it takes some time.
 
-        L.marker(this.coords)
+        marker(this.coords)
             .addTo(App.getMap())
             .bindPopup(
-                L.popup({
+                popup({
                     maxWidth: 250,
                     minWidth: 100,
                     autoClose: false, // prevent the default behavior of the popup closing when another popup is opened

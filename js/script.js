@@ -4,7 +4,7 @@ import ModalMessage from './modules/modalMessage.js';
 import Running from './modules/running.js';
 import Cycling from './modules/cycling.js';
 import WeatherAPI from './modules/weather.js';
-import { getJSON } from './services/fetch.js';
+import { map, tileLayer } from 'leaflet';
 
 const form = document.querySelector('.form');
 const containerWorkouts = document.querySelector('.workouts');
@@ -54,10 +54,7 @@ export default class App {
 
                 await WeatherAPI.renderWeather({ containerWorkouts });
 
-                await this.timeUpdate({
-                    time: WeatherAPI.timeForWeatherURL(latitude, longitude),
-                    weather: WeatherAPI.weatherURL(latitude, longitude),
-                });
+                await this.timeUpdate();
             } catch (err) {
                 console.log(err);
                 new ModalMessage(`${err.message}`, 10).openModal();
@@ -116,7 +113,7 @@ export default class App {
         });
     }
 
-    timeUpdate({ time, weather }) {
+    timeUpdate() {
         return new Promise(resolve => {
             setInterval(async () => {
                 try {
@@ -125,16 +122,16 @@ export default class App {
                 } catch (err) {
                     new ModalMessage(`${err.message}`, 10).openModal();
                 }
-            }, 1000 * 60 * 5); // 2 min
+            }, 1000 * 60 * 5); // 5 min
         });
     }
 
     _loadMap(...coords) {
         // if we doesn't set the this keyword manually, we will get an undefined
         // console.log(this);
-        App.setMap(L.map('map').setView(coords, App.getMapZoomLevel()));
+        App.setMap(map('map').setView(coords, App.getMapZoomLevel()));
 
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution:
                 '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         }).addTo(App.getMap());
@@ -550,6 +547,8 @@ export default class App {
         }
 
         WeatherAPI.weatherData.delete(id);
+
+        console.log(WeatherAPI.weatherData);
 
         new ModalMessage('Workout deleted! 😚').openModal();
         this._hideElement(containerWorkouts, sortBtn);
