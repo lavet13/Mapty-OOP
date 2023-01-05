@@ -534,7 +534,6 @@ function hmrAcceptRun(bundle, id) {
 },{}],"4pp4s":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "form", ()=>form);
 var _modalMessageJs = require("./modules/modalMessage.js");
 var _modalMessageJsDefault = parcelHelpers.interopDefault(_modalMessageJs);
 var _runningJs = require("./modules/running.js");
@@ -543,40 +542,41 @@ var _cyclingJs = require("./modules/cycling.js");
 var _cyclingJsDefault = parcelHelpers.interopDefault(_cyclingJs);
 var _weatherJs = require("./modules/weather.js");
 var _weatherJsDefault = parcelHelpers.interopDefault(_weatherJs);
-var _leaflet = require("leaflet");
+var _leafletJs = require("./modules/leaflet.js");
+var _leafletJsDefault = parcelHelpers.interopDefault(_leafletJs);
 "use strict";
-const form = document.querySelector(".form");
-const containerWorkouts = document.querySelector(".workouts");
-const inputType = document.querySelector(".form__input--type");
-const inputDistance = document.querySelector(".form__input--distance");
-const inputDuration = document.querySelector(".form__input--duration");
-const inputCadence = document.querySelector(".form__input--cadence");
-const inputElevation = document.querySelector(".form__input--elevation");
-// SORT options
-let isSortAscending;
-let sortType = "distance";
-// SORT BUTTON
-const sortBtn = document.querySelector(".btn--sort");
-const selectSort = document.querySelector(".sort-selector");
 class App {
     static workouts = [];
     static #id = 0n;
     static #map;
     static #mapEvent;
     static #mapZoomLevel = 13;
+    // SORT options
+    isSortAscending;
+    sortType = "distance";
+    // DOM elements
+    static sortBtn = document.querySelector(".btn--sort");
+    static selectSort = document.querySelector(".sort-selector");
+    static form = document.querySelector(".form");
+    static containerWorkouts = document.querySelector(".workouts");
+    static inputType = document.querySelector(".form__input--type");
+    static inputDistance = document.querySelector(".form__input--distance");
+    static inputDuration = document.querySelector(".form__input--duration");
+    static inputCadence = document.querySelector(".form__input--cadence");
+    static inputElevation = document.querySelector(".form__input--elevation");
     constructor(){
         (async ()=>{
             try {
                 const position = await this.getPosition();
                 const { latitude , longitude  } = position.coords;
-                this._loadMap(latitude, longitude);
+                (0, _leafletJsDefault.default).loadMap(latitude, longitude);
                 (0, _weatherJsDefault.default).currentTime = await (0, _weatherJsDefault.default).getTimeForWeather((0, _weatherJsDefault.default).timeForWeatherURL(latitude, longitude));
                 // await WeatherAPI.getWeather(this._weatherURL(latitude, longitude)); // get your own weather conditions
                 this._getLocalStorage();
-                this._hideElement(containerWorkouts, sortBtn);
-                this._hideElement(containerWorkouts, selectSort);
+                this._hideElement(App.containerWorkouts, App.sortBtn);
+                this._hideElement(App.containerWorkouts, App.selectSort);
                 await (0, _weatherJsDefault.default).renderWeather({
-                    containerWorkouts
+                    containerWorkouts: App.containerWorkouts
                 });
                 await this.timeUpdate();
             } catch (err) {
@@ -584,11 +584,11 @@ class App {
                 new (0, _modalMessageJsDefault.default)(`${err.message}`, 10).openModal();
             }
         })();
-        form.addEventListener("submit", this._newWorkout.bind(this));
-        inputType.addEventListener("change", this._toggleElevationField);
-        containerWorkouts.addEventListener("click", this._moveToPopup.bind(this));
-        sortBtn.addEventListener("click", this._sort.bind(this));
-        selectSort.addEventListener("change", this._typeOfSort.bind(this));
+        App.form.addEventListener("submit", this._newWorkout.bind(this));
+        App.inputType.addEventListener("change", this._toggleElevationField);
+        App.containerWorkouts.addEventListener("click", this._moveToPopup.bind(this));
+        App.sortBtn.addEventListener("click", this._sort.bind(this));
+        App.selectSort.addEventListener("change", this._typeOfSort.bind(this));
     }
     // COUNTER
     static #incrementId() {
@@ -618,6 +618,12 @@ class App {
     static getMapZoomLevel() {
         return this.#mapZoomLevel;
     }
+    static showForm(mapE) {
+        App.form.classList.remove("hidden");
+        App.inputDistance.focus();
+        App.setMapEvent(mapE);
+        console.log(mapE);
+    }
     getPosition() {
         return new Promise((resolve, reject)=>{
             navigator.geolocation.getCurrentPosition(resolve, reject);
@@ -627,43 +633,28 @@ class App {
         return new Promise((resolve)=>{
             setInterval(async ()=>{
                 try {
-                    await (0, _weatherJsDefault.default).renderWeather({
-                        containerWorkouts
+                    new Date().getMinutes() % 60 === 0 && await (0, _weatherJsDefault.default).renderWeather({
+                        containerWorkouts: App.containerWorkouts
                     });
                     resolve();
                 } catch (err) {
                     new (0, _modalMessageJsDefault.default)(`${err.message}`, 10).openModal();
                 }
-            }, 300000); // 5 min
+            }, 60000); // 1 min
         });
-    }
-    _loadMap(...coords) {
-        // if we doesn't set the this keyword manually, we will get an undefined
-        // console.log(this);
-        App.setMap((0, _leaflet.map)("map").setView(coords, App.getMapZoomLevel()));
-        (0, _leaflet.tileLayer)("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(App.getMap());
-        App.getMap().on("click", this._showForm.bind(this));
-    }
-    _showForm(mapE) {
-        form.classList.remove("hidden");
-        inputDistance.focus();
-        App.setMapEvent(mapE);
-        console.log(mapE);
     }
     _toggleElevationField(e) {
         e.preventDefault();
-        inputCadence.closest(".form__row").classList.toggle("form__row--hidden");
-        inputElevation.closest(".form__row").classList.toggle("form__row--hidden");
+        App.inputCadence.closest(".form__row").classList.toggle("form__row--hidden");
+        App.inputElevation.closest(".form__row").classList.toggle("form__row--hidden");
     }
     _hideForm() {
-        form.reset();
-        form.style.display = "none"; // prevent of having animation on the element all the time
-        form.classList.add("hidden");
-        setTimeout(()=>form.style.display = "grid", 1);
-        inputCadence.closest(".form__row").classList.remove("form__row--hidden");
-        inputElevation.closest(".form__row").classList.add("form__row--hidden");
+        App.form.reset();
+        App.form.style.display = "none"; // prevent of having animation on the element all the time
+        App.form.classList.add("hidden");
+        setTimeout(()=>App.form.style.display = "grid", 1);
+        App.inputCadence.closest(".form__row").classList.remove("form__row--hidden");
+        App.inputElevation.closest(".form__row").classList.add("form__row--hidden");
     }
     async _newWorkout(e) {
         try {
@@ -676,31 +667,31 @@ class App {
                 latitude,
                 longitude
             ];
-            const type = inputType.value, distance = inputDistance.value, duration = inputDuration.value;
+            const type = App.inputType.value, distance = App.inputDistance.value, duration = App.inputDuration.value;
             const newId = App.#incrementId();
             if (type === "running") {
-                const cadence = inputCadence.value;
+                const cadence = App.inputCadence.value;
                 if (!isFilledInputs(distance, duration, cadence)) return new (0, _modalMessageJsDefault.default)("Inputs have to be filled!").openModal();
                 if (!validInputsNumbers(distance, duration, cadence)) return new (0, _modalMessageJsDefault.default)("Inputs have to be THE numbers!").openModal();
                 if (!allPositive(distance, duration, cadence)) return new (0, _modalMessageJsDefault.default)("Inputs have to be positive numbers!").openModal();
                 App.workouts.push(new (0, _runningJsDefault.default)(distance, duration, coords, cadence).setId(newId).render().addMarkToMap());
             }
             if (type === "cycling") {
-                const elevationGain = inputElevation.value;
+                const elevationGain = App.inputElevation.value;
                 if (!isFilledInputs(distance, duration, elevationGain)) return new (0, _modalMessageJsDefault.default)("Inputs have to be filled!").openModal();
                 if (!validInputsNumbers(distance, duration, elevationGain)) return new (0, _modalMessageJsDefault.default)("Inputs have to be THE numbers!").openModal();
                 if (!allPositive(distance, duration)) return new (0, _modalMessageJsDefault.default)("Inputs have to be positive numbers!").openModal();
                 App.workouts.push(new (0, _cyclingJsDefault.default)(distance, duration, coords, elevationGain).setId(newId).render().addMarkToMap());
             }
             await (0, _weatherJsDefault.default).addNextWeatherData({
-                containerWorkouts,
+                containerWorkouts: App.containerWorkouts,
                 newId
             });
             new (0, _modalMessageJsDefault.default)("New workout created! \uD83D\uDE0C").openModal();
             this._setLocalStorage();
             this._hideForm();
-            this._hideElement(containerWorkouts, sortBtn);
-            this._hideElement(containerWorkouts, selectSort);
+            this._hideElement(App.containerWorkouts, App.sortBtn);
+            this._hideElement(App.containerWorkouts, App.selectSort);
         } catch (err) {
             console.error(err);
             throw err;
@@ -721,9 +712,7 @@ class App {
         const workout = App.workouts.find(({ id  })=>{
             return id === closest.dataset.id;
         });
-        // console.log(workout); // if it didn't find workout then it would be undefined
-        workout && App.getMap().panTo(workout.coords, options);
-        workout ?? new (0, _modalMessageJsDefault.default)(`can't find the workout ❌`).openModal();
+        workout ? App.getMap().panTo(workout.coords, options) : new (0, _modalMessageJsDefault.default)(`can't find the workout ❌`).openModal();
     }
     _editWorkout(e) {
         if (!e.target.matches(".btn--edit")) return false;
@@ -848,7 +837,6 @@ class App {
         const [workoutObj] = workout;
         if (workoutObj.type === "running") App.workouts.push(new (0, _runningJsDefault.default)(workoutObj.distance, workoutObj.duration, workoutObj.coords, workoutObj.cadence).setId(workoutObj.id).render());
         if (workoutObj.type === "cycling") App.workouts.push(new (0, _cyclingJsDefault.default)(workoutObj.distance, workoutObj.duration, workoutObj.coords, workoutObj.elevationGain).setId(workoutObj.id).render());
-        workoutContainer = document.querySelector(`[data-id="${data.id}"]`);
         (0, _weatherJsDefault.default).reRenderWeather({
             workoutContainer,
             id: data.id
@@ -895,16 +883,16 @@ class App {
         (0, _weatherJsDefault.default).weatherData.delete(id);
         console.log((0, _weatherJsDefault.default).weatherData);
         new (0, _modalMessageJsDefault.default)("Workout deleted! \uD83D\uDE1A").openModal();
-        this._hideElement(containerWorkouts, sortBtn);
-        this._hideElement(containerWorkouts, selectSort);
+        this._hideElement(App.containerWorkouts, App.sortBtn);
+        this._hideElement(App.containerWorkouts, App.selectSort);
         this._setLocalStorage();
         return true;
     }
     _sort(e) {
         e.preventDefault();
-        switch(sortType){
+        switch(this.sortType){
             case "distance":
-                if (isSortAscending = !isSortAscending) App.workouts.sort(({ distance: d1  }, { distance: d2  })=>{
+                if (this.isSortAscending = !this.isSortAscending) App.workouts.sort(({ distance: d1  }, { distance: d2  })=>{
                     return d1 > d2 ? -1 : 1;
                 });
                 else App.workouts.sort(({ distance: d1  }, { distance: d2  })=>{
@@ -912,7 +900,7 @@ class App {
                 });
                 break;
             case "duration":
-                if (isSortAscending = !isSortAscending) App.workouts.sort(({ duration: d1  }, { duration: d2  })=>{
+                if (this.isSortAscending = !this.isSortAscending) App.workouts.sort(({ duration: d1  }, { duration: d2  })=>{
                     return d1 > d2 ? -1 : 1;
                 });
                 else App.workouts.sort(({ duration: d1  }, { duration: d2  })=>{
@@ -920,7 +908,7 @@ class App {
                 });
                 break;
         }
-        containerWorkouts.querySelectorAll(".workout").forEach((workout)=>workout.remove());
+        App.containerWorkouts.querySelectorAll(".workout").forEach((workout)=>workout.remove());
         App.workouts.forEach((workout)=>{
             if (workout.type === "running") {
                 const { distance , duration , cadence , coords , id  } = workout;
@@ -931,11 +919,26 @@ class App {
                 new (0, _cyclingJsDefault.default)(distance1, duration1, coords1, elevationGain).setId(id1).render();
             }
         });
+        Array.from(App.containerWorkouts.children, (work)=>{
+            const { temperature , tempType , weatherState  } = (0, _weatherJsDefault.default).weatherData.get(work.dataset.id);
+            App.containerWorkouts.querySelector(`[data-id="${work.dataset.id}"]`).insertAdjacentHTML("beforeend", `
+                    <div class="workout__details workout__weather">
+                        <span class="workout__icon">️</span>
+                        <span class="workout__value">${weatherState}</span>
+                        <span class="workout__unit"></span>
+                    </div>
+                    <div class="workout__details workout__weather">
+                        <span class="workout__icon">🌡️</span>
+                        <span class="workout__value">${temperature}</span>
+                        <span class="workout__unit">${tempType}</span>
+                    </div>   
+                    `);
+        });
         this._setLocalStorage();
     }
     _typeOfSort(e) {
         e.preventDefault();
-        sortType = e.target.value;
+        this.sortType = e.target.value;
     }
     _hideElement(workouts, element) {
         if (workouts.querySelectorAll(".workout").length < 2) element.style.display = "none";
@@ -949,7 +952,7 @@ class App {
     _setLocalStorage() {
         localStorage.setItem("workouts", JSON.stringify(App.workouts));
         localStorage.setItem("currentId", App.getId());
-        localStorage.setItem("sort", isSortAscending);
+        localStorage.setItem("sort", this.isSortAscending);
     }
     _getLocalStorage() {
         // undefined
@@ -962,7 +965,7 @@ class App {
                 if (workout.type === "cycling") new (0, _cyclingJsDefault.default)(workout.distance, workout.duration, workout.coords, workout.elevationGain).setId(workout.id).render().addMarkToMap();
             });
         }
-        isSortAscending = localStorage.getItem("sort") ? localStorage.getItem("sort") : false;
+        this.isSortAscending = localStorage.getItem("sort") ? localStorage.getItem("sort") : false;
     }
     static reset() {
         localStorage.removeItem("workouts");
@@ -1155,7 +1158,7 @@ form.addEventListener('submit', e => {
 });
 */ 
 
-},{"./modules/modalMessage.js":"81hUJ","./modules/running.js":"jLZJH","./modules/cycling.js":"3cTAV","./modules/weather.js":"lggtR","leaflet":"iFbO2","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"81hUJ":[function(require,module,exports) {
+},{"./modules/modalMessage.js":"81hUJ","./modules/running.js":"jLZJH","./modules/cycling.js":"3cTAV","./modules/weather.js":"lggtR","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3","./modules/leaflet.js":"imV8k"}],"81hUJ":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
 class ModalMessage {
@@ -1250,8 +1253,8 @@ exports.default = Running;
 },{"./workout.js":"77SSe","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"77SSe":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
-var _scriptJs = require("../script.js");
 var _leaflet = require("leaflet");
+var _scriptJs = require("../script.js");
 var _scriptJsDefault = parcelHelpers.interopDefault(_scriptJs);
 class Workout {
     date = new Date().toISOString();
@@ -1332,7 +1335,7 @@ class Workout {
             <button class="btn btn--edit"><span>📝</span>Edit</button>
             <button class="btn btn--del"><span>❌</span>Delete</button>
         </li>`;
-        (0, _scriptJs.form).insertAdjacentHTML("afterend", html);
+        (0, _scriptJsDefault.default).form.insertAdjacentHTML("afterend", html);
         return this;
     }
 }
@@ -12153,6 +12156,25 @@ async function getJSON(url, msg = `Something went wrong`) {
     }
 }
 
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}]},["2Rsls","4pp4s"], "4pp4s", "parcelRequire8112")
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"imV8k":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+var _scriptJs = require("../script.js");
+var _scriptJsDefault = parcelHelpers.interopDefault(_scriptJs);
+var _leaflet = require("leaflet");
+class Leaflet {
+    static loadMap(...coords) {
+        // if we doesn't set the this keyword manually, we will get an undefined
+        // console.log(this);
+        (0, _scriptJsDefault.default).setMap((0, _leaflet.map)("map").setView(coords, (0, _scriptJsDefault.default).getMapZoomLevel()));
+        (0, _leaflet.tileLayer)("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo((0, _scriptJsDefault.default).getMap());
+        (0, _scriptJsDefault.default).getMap().on("click", (0, _scriptJsDefault.default).showForm);
+    }
+}
+exports.default = Leaflet;
+
+},{"../script.js":"4pp4s","leaflet":"iFbO2","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}]},["2Rsls","4pp4s"], "4pp4s", "parcelRequire8112")
 
 //# sourceMappingURL=index.4de9b498.js.map

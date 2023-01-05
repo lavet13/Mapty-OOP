@@ -4,25 +4,7 @@ import ModalMessage from './modules/modalMessage.js';
 import Running from './modules/running.js';
 import Cycling from './modules/cycling.js';
 import WeatherAPI from './modules/weather.js';
-import { map, tileLayer } from 'leaflet';
-
-const form = document.querySelector('.form');
-const containerWorkouts = document.querySelector('.workouts');
-const inputType = document.querySelector('.form__input--type');
-const inputDistance = document.querySelector('.form__input--distance');
-const inputDuration = document.querySelector('.form__input--duration');
-const inputCadence = document.querySelector('.form__input--cadence');
-const inputElevation = document.querySelector('.form__input--elevation');
-
-// SORT options
-let isSortAscending;
-let sortType = 'distance';
-
-// SORT BUTTON
-const sortBtn = document.querySelector('.btn--sort');
-const selectSort = document.querySelector('.sort-selector');
-
-export { form };
+import Leaflet from './modules/leaflet.js';
 
 ////////////////////////////////////////////////////
 // APPLICATION ARCHITECTURE
@@ -33,13 +15,29 @@ export default class App {
     static #mapEvent;
     static #mapZoomLevel = 13;
 
+    // SORT options
+    isSortAscending;
+    sortType = 'distance';
+
+    // DOM elements
+    static sortBtn = document.querySelector('.btn--sort');
+    static selectSort = document.querySelector('.sort-selector');
+
+    static form = document.querySelector('.form');
+    static containerWorkouts = document.querySelector('.workouts');
+    static inputType = document.querySelector('.form__input--type');
+    static inputDistance = document.querySelector('.form__input--distance');
+    static inputDuration = document.querySelector('.form__input--duration');
+    static inputCadence = document.querySelector('.form__input--cadence');
+    static inputElevation = document.querySelector('.form__input--elevation');
+
     constructor() {
         (async () => {
             try {
                 const position = await this.getPosition();
                 const { latitude, longitude } = position.coords;
 
-                this._loadMap(latitude, longitude);
+                Leaflet.loadMap(latitude, longitude);
 
                 WeatherAPI.currentTime = await WeatherAPI.getTimeForWeather(
                     WeatherAPI.timeForWeatherURL(latitude, longitude)
@@ -49,10 +47,12 @@ export default class App {
 
                 this._getLocalStorage();
 
-                this._hideElement(containerWorkouts, sortBtn);
-                this._hideElement(containerWorkouts, selectSort);
+                this._hideElement(App.containerWorkouts, App.sortBtn);
+                this._hideElement(App.containerWorkouts, App.selectSort);
 
-                await WeatherAPI.renderWeather({ containerWorkouts });
+                await WeatherAPI.renderWeather({
+                    containerWorkouts: App.containerWorkouts,
+                });
 
                 await this.timeUpdate();
             } catch (err) {
@@ -61,14 +61,14 @@ export default class App {
             }
         })();
 
-        form.addEventListener('submit', this._newWorkout.bind(this));
-        inputType.addEventListener('change', this._toggleElevationField);
-        containerWorkouts.addEventListener(
+        App.form.addEventListener('submit', this._newWorkout.bind(this));
+        App.inputType.addEventListener('change', this._toggleElevationField);
+        App.containerWorkouts.addEventListener(
             'click',
             this._moveToPopup.bind(this)
         );
-        sortBtn.addEventListener('click', this._sort.bind(this));
-        selectSort.addEventListener('change', this._typeOfSort.bind(this));
+        App.sortBtn.addEventListener('click', this._sort.bind(this));
+        App.selectSort.addEventListener('change', this._typeOfSort.bind(this));
     }
 
     // COUNTER
@@ -107,6 +107,13 @@ export default class App {
         return this.#mapZoomLevel;
     }
 
+    static showForm(mapE) {
+        App.form.classList.remove('hidden');
+        App.inputDistance.focus();
+        App.setMapEvent(mapE);
+        console.log(mapE);
+    }
+
     getPosition() {
         return new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject);
@@ -117,57 +124,42 @@ export default class App {
         return new Promise(resolve => {
             setInterval(async () => {
                 try {
-                    await WeatherAPI.renderWeather({ containerWorkouts });
+                    new Date().getMinutes() % 60 === 0 &&
+                        (await WeatherAPI.renderWeather({
+                            containerWorkouts: App.containerWorkouts,
+                        }));
                     resolve();
                 } catch (err) {
                     new ModalMessage(`${err.message}`, 10).openModal();
                 }
-            }, 1000 * 60 * 5); // 5 min
+            }, 1000 * 60); // 1 min
         });
-    }
-
-    _loadMap(...coords) {
-        // if we doesn't set the this keyword manually, we will get an undefined
-        // console.log(this);
-        App.setMap(map('map').setView(coords, App.getMapZoomLevel()));
-
-        tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution:
-                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        }).addTo(App.getMap());
-
-        App.getMap().on('click', this._showForm.bind(this));
-    }
-
-    _showForm(mapE) {
-        form.classList.remove('hidden');
-        inputDistance.focus();
-        App.setMapEvent(mapE);
-        console.log(mapE);
     }
 
     _toggleElevationField(e) {
         e.preventDefault();
 
-        inputCadence
+        App.inputCadence
             .closest('.form__row')
             .classList.toggle('form__row--hidden');
 
-        inputElevation
+        App.inputElevation
             .closest('.form__row')
             .classList.toggle('form__row--hidden');
     }
 
     _hideForm() {
-        form.reset();
-        form.style.display = 'none'; // prevent of having animation on the element all the time
-        form.classList.add('hidden');
-        setTimeout(() => (form.style.display = 'grid'), 1);
+        App.form.reset();
+        App.form.style.display = 'none'; // prevent of having animation on the element all the time
+        App.form.classList.add('hidden');
+        setTimeout(() => (App.form.style.display = 'grid'), 1);
 
-        inputCadence
+        App.inputCadence
             .closest('.form__row')
             .classList.remove('form__row--hidden');
-        inputElevation.closest('.form__row').classList.add('form__row--hidden');
+        App.inputElevation
+            .closest('.form__row')
+            .classList.add('form__row--hidden');
     }
 
     async _newWorkout(e) {
@@ -185,14 +177,14 @@ export default class App {
 
             const { lat: latitude, lng: longitude } = App.getMapEvent().latlng;
             const coords = [latitude, longitude];
-            const type = inputType.value,
-                distance = inputDistance.value,
-                duration = inputDuration.value;
+            const type = App.inputType.value,
+                distance = App.inputDistance.value,
+                duration = App.inputDuration.value;
 
             const newId = App.#incrementId();
 
             if (type === 'running') {
-                const cadence = inputCadence.value;
+                const cadence = App.inputCadence.value;
 
                 if (!isFilledInputs(distance, duration, cadence)) {
                     return new ModalMessage(
@@ -221,7 +213,7 @@ export default class App {
             }
 
             if (type === 'cycling') {
-                const elevationGain = inputElevation.value;
+                const elevationGain = App.inputElevation.value;
 
                 if (!isFilledInputs(distance, duration, elevationGain)) {
                     return new ModalMessage(
@@ -250,15 +242,15 @@ export default class App {
             }
 
             await WeatherAPI.addNextWeatherData({
-                containerWorkouts,
+                containerWorkouts: App.containerWorkouts,
                 newId,
             });
 
             new ModalMessage('New workout created! 😌').openModal();
             this._setLocalStorage();
             this._hideForm();
-            this._hideElement(containerWorkouts, sortBtn);
-            this._hideElement(containerWorkouts, selectSort);
+            this._hideElement(App.containerWorkouts, App.sortBtn);
+            this._hideElement(App.containerWorkouts, App.selectSort);
         } catch (err) {
             console.error(err);
             throw err;
@@ -284,10 +276,9 @@ export default class App {
             return id === closest.dataset.id;
         });
 
-        // console.log(workout); // if it didn't find workout then it would be undefined
-        workout && App.getMap().panTo(workout.coords, options);
-
-        workout ?? new ModalMessage(`can't find the workout ❌`).openModal();
+        workout
+            ? App.getMap().panTo(workout.coords, options)
+            : new ModalMessage(`can't find the workout ❌`).openModal();
     }
 
     _editWorkout(e) {
@@ -498,8 +489,6 @@ export default class App {
             );
         }
 
-        workoutContainer = document.querySelector(`[data-id="${data.id}"]`);
-
         WeatherAPI.reRenderWeather({ workoutContainer, id: data.id });
 
         new ModalMessage('Canceled! HAha 🤔').openModal();
@@ -551,8 +540,8 @@ export default class App {
         console.log(WeatherAPI.weatherData);
 
         new ModalMessage('Workout deleted! 😚').openModal();
-        this._hideElement(containerWorkouts, sortBtn);
-        this._hideElement(containerWorkouts, selectSort);
+        this._hideElement(App.containerWorkouts, App.sortBtn);
+        this._hideElement(App.containerWorkouts, App.selectSort);
         this._setLocalStorage();
         return true;
     }
@@ -560,9 +549,9 @@ export default class App {
     _sort(e) {
         e.preventDefault();
 
-        switch (sortType) {
+        switch (this.sortType) {
             case 'distance':
-                if ((isSortAscending = !isSortAscending)) {
+                if ((this.isSortAscending = !this.isSortAscending)) {
                     App.workouts.sort(({ distance: d1 }, { distance: d2 }) => {
                         return d1 > d2 ? -1 : 1;
                     });
@@ -574,7 +563,7 @@ export default class App {
                 break;
 
             case 'duration':
-                if ((isSortAscending = !isSortAscending)) {
+                if ((this.isSortAscending = !this.isSortAscending)) {
                     App.workouts.sort(({ duration: d1 }, { duration: d2 }) => {
                         return d1 > d2 ? -1 : 1;
                     });
@@ -586,7 +575,7 @@ export default class App {
                 break;
         }
 
-        containerWorkouts
+        App.containerWorkouts
             .querySelectorAll('.workout')
             .forEach(workout => workout.remove());
 
@@ -607,13 +596,36 @@ export default class App {
             }
         });
 
+        Array.from(App.containerWorkouts.children, work => {
+            const { temperature, tempType, weatherState } =
+                WeatherAPI.weatherData.get(work.dataset.id);
+
+            App.containerWorkouts
+                .querySelector(`[data-id="${work.dataset.id}"]`)
+                .insertAdjacentHTML(
+                    'beforeend',
+                    `
+                    <div class="workout__details workout__weather">
+                        <span class="workout__icon">️</span>
+                        <span class="workout__value">${weatherState}</span>
+                        <span class="workout__unit"></span>
+                    </div>
+                    <div class="workout__details workout__weather">
+                        <span class="workout__icon">🌡️</span>
+                        <span class="workout__value">${temperature}</span>
+                        <span class="workout__unit">${tempType}</span>
+                    </div>   
+                    `
+                );
+        });
+
         this._setLocalStorage();
     }
 
     _typeOfSort(e) {
         e.preventDefault();
 
-        sortType = e.target.value;
+        this.sortType = e.target.value;
     }
 
     _hideElement(workouts, element) {
@@ -632,7 +644,7 @@ export default class App {
     _setLocalStorage() {
         localStorage.setItem('workouts', JSON.stringify(App.workouts));
         localStorage.setItem('currentId', App.getId());
-        localStorage.setItem('sort', isSortAscending);
+        localStorage.setItem('sort', this.isSortAscending);
     }
 
     _getLocalStorage() {
@@ -671,7 +683,7 @@ export default class App {
             });
         }
 
-        isSortAscending = localStorage.getItem('sort')
+        this.isSortAscending = localStorage.getItem('sort')
             ? localStorage.getItem('sort')
             : false;
     }

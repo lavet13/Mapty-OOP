@@ -1,4 +1,3 @@
-import { form } from '../script.js';
 import { marker, popup } from 'leaflet';
 import App from '../script.js';
 
@@ -121,7 +120,7 @@ export default class Workout {
             <button class="btn btn--del"><span>❌</span>Delete</button>
         </li>`;
 
-        form.insertAdjacentHTML('afterend', html);
+        App.form.insertAdjacentHTML('afterend', html);
         return this;
     }
 }
