@@ -14,6 +14,8 @@
         "parcel": "^2.8.2"
     },
     "dependencies": {
-        "leaflet": "^1.9.3"
+        "core-js": "^3.27.1",
+        "leaflet": "^1.9.3",
+        "regenerator-runtime": "^0.13.11"
     }
 }

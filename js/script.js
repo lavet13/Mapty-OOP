@@ -1,4 +1,5 @@
-'use strict';
+import 'core-js'; // polyfilling
+import 'regenerator-runtime'; // async await
 
 import ModalMessage from './modules/modalMessage.js';
 import Running from './modules/running.js';
